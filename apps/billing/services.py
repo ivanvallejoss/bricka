@@ -1,27 +1,33 @@
 from datetime import date
 from decimal import Decimal
+from typing import Optional, TYPE_CHECKING
 
 from django.db import transaction, IntegrityError
+from django.contrib.auth import get_user_model
 
 from apps.common.choices import Currency
-from apps.contacts.models import Contact
-from apps.contracts.models import RentalContract
-from apps.deals.models import Deal
-from apps.users.models import User
 
 from .choices import ConceptLineType, DocumentStatus, DocumentType
 from .concept import ConceptLine
 from .exceptions import (
-    DuplicateRentReceipt,
     InvalidConceptLine,
     InvalidLineTypeForDocument,
     MissingPeriod,
     MissingRecipient,
     MissingRequiredRelation,
     DuplicatePeriodicReceipt,
+    UnmappedConceptLineSign,
 )
 from .models import BillingDocument
 from .numbering import assign_document_number
+
+if TYPE_CHECKING:
+    from apps.contacts.models import Contact
+    from apps.contracts.models import RentalContract
+    from apps.deals.models import Deal
+    from apps.users.models import User
+
+User = get_user_model()
 
 
 # Qué ConceptLineType es válido en cada DocumentType (matriz acordada).
@@ -76,12 +82,6 @@ _OWNER_STATEMENT_SIGN: dict[str, Decimal] = {
 
 
 _UNIQUE_ISSUED_RENT_RECEIPT_CONSTRAINT = "unique_issued_rent_receipt_per_period"
-
-
-def _line_sign(document_type: str, line_type: str) -> Decimal:
-    if document_type == DocumentType.OWNER_STATEMENT:
-        return _OWNER_STATEMENT_SIGN[line_type]
-    return _RECEIPT_SIGN[line_type]
 
 _PERIOD_REQUIRED = {
     DocumentType.RENT_RECEIPT,
@@ -183,11 +183,11 @@ def create_billing_document(
     lines: list[ConceptLine],
     date: date,
     period: date | None = None,
-    contract: RentalContract | None = None,
-    deal: Deal | None = None,
-    recipient_contact: Contact | None = None,
+    contract: Optional["RentalContract"] | None = None,
+    deal: Optional["Deal"] | None = None,
+    recipient_contact: Optional["Contact"] | None = None,
     currency: str = Currency.ARS,
-    actor: User | None = None,
+    actor: Optional["User"] | None = None,
 ) -> BillingDocument:
     """Emite un comprobante. Único punto válido de creación.
 
@@ -196,7 +196,7 @@ def create_billing_document(
 
     Raises (todos BillingBusinessError, capturables por la view):
         MissingRequiredRelation, MissingRecipient, MissingPeriod,
-        InvalidConceptLine, InvalidLineTypeForDocument, DuplicateRentReceipt.
+        InvalidConceptLine, InvalidLineTypeForDocument, DuplicatePeriodicReceipt.
     """
     if document_type not in _ALLOWED_LINE_TYPES:
         raise InvalidLineTypeForDocument(
