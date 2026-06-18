@@ -2,12 +2,11 @@ from django.conf import settings
 from django.db import models
 
 from apps.common.choices import Currency
-from apps.common.models import TimestampModel
-from apps.common.models import AuditableMixin
+from apps.common.models import BaseModel, AuditableMixin
 from .choices import DocumentType, DocumentStatus
 
 
-class BillingDocument(TimestampModel, AuditableMixin):
+class BillingDocument(BaseModel, AuditableMixin):
     """
     Comprobante de cobro interno — alquiler, comisión, gasto o rendición.
 
@@ -43,8 +42,7 @@ class BillingDocument(TimestampModel, AuditableMixin):
     date (fecha de emisión). Un recibo de marzo emitido en mayo tiene
     date=mayo, period=2026-03-01. El badge de estado de pago consulta period.
 
-    updated_at existe por herencia de TimestampModel — ruido aceptable,
-    semánticamente sin valor en una tabla append-only.
+    BaseModel genera `created_by` y `updated_by`
     """
     deal = models.ForeignKey(
         "deals.Deal",
@@ -85,12 +83,6 @@ class BillingDocument(TimestampModel, AuditableMixin):
         default=DocumentStatus.ISSUED,
     )
     pdf_url = models.URLField(blank=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-    )
     recipient_name = models.CharField(max_length=255, default="")
     recipient_document_type = models.CharField(max_length=20, default="", blank=True)
     recipient_document_number = models.CharField(max_length=50, default="", blank=True)
@@ -102,6 +94,16 @@ class BillingDocument(TimestampModel, AuditableMixin):
             models.UniqueConstraint(
                 fields=["document_type", "number"],
                 name="unique_number_per_document_type",
+            ),
+            models.UniqueConstraint(
+                fields=["contract", "period"],
+                condition=models.Q(document_type="rent_receipt", status="issued"),
+                name="unique_issued_rent_receipt_per_period",
+            ),
+            models.UniqueConstraint(
+                fields=["contract", "period"],
+                condition=models.Q(document_type="expense_receipt", status="issued"),
+                name="unique_issued_expense_receipt_per_period",
             ),
         ]
         indexes = [
