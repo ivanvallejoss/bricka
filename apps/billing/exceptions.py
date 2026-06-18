@@ -44,11 +44,6 @@ class MissingPeriod(BillingBusinessError):
     """RENT_RECEIPT u OWNER_STATEMENT sin period."""
 
 
-class DuplicateRentReceipt(BillingBusinessError):
-    """Ya existe un RENT_RECEIPT issued para ese (contract, period).
-    Para reemitir, cancelar primero el existente."""
-
-
 class UnmappedConceptLineSign(Exception):
     """(document_type, line_type) sin signo configurado en _RECEIPT_SIGN
     o _OWNER_STATEMENT_SIGN. Indica que alguien extendió

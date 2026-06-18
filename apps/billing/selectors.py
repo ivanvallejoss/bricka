@@ -4,10 +4,14 @@ from datetime import date
 from uuid import UUID
 
 from apps.contracts.choices import ContractStatus
-from apps.contracts.models import RentalContract # Import solo a modo de type hint
 
 from .choices import DocumentStatus, DocumentType, PaymentStatus
 from .models import BillingDocument
+
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from apps.contracts.models import RentalContract # Import solo a modo de type hint
 
 
 def _period_start(as_of: date) -> date:
@@ -20,7 +24,7 @@ def _period_start(as_of: date) -> date:
 
 
 def get_rental_payment_status(
-    contracts: Iterable[RentalContract],
+    contracts: Iterable["RentalContract"],
     *,
     as_of: date,
 ) -> dict[UUID, str]:

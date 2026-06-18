@@ -150,7 +150,7 @@ def update_property_status(*, property: Property, status: str, actor: User) -> P
     property.status = status
     property.updated_by = actor
     property.save(update_fields=["status", "updated_by", "updated_at"])
-    return property\
+    return property
 
 
 def archive_property(*, property: Property, actor: User) -> Property:
