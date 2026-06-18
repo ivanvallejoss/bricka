@@ -1,0 +1,36 @@
+<div class="px-5 py-4">
+    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+        Publicaciones
+    </p>
+    {% if listings %}
+        <div class="space-y-2">
+        {% for listing in listings %}
+            <div class="flex items-center justify-between gap-3 p-3 rounded-md
+                        bg-surface-container-low border border-outline">
+                <div>
+                    <p class="text-sm font-medium text-on-surface">
+                        {% if listing.operation_type == 'sale' %}Venta
+                        {% elif listing.operation_type == 'rent' %}Alquiler
+                        {% elif listing.operation_type == 'temporary_rent' %}Alquiler temporario
+                        {% endif %}
+                    </p>
+                    <p class="text-xs text-on-surface-variant mt-0.5 tabular-nums">
+                        ${{ listing.price|floatformat:0 }}
+                    </p>
+                </div>
+                {% if listing.status == 'published' %}
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">
+                        Publicado
+                    </span>
+                {% else %}
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">
+                        {{ listing.get_status_display }}
+                    </span>
+                {% endif %}
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-sm text-on-surface-variant">Sin publicaciones activas.</p>
+    {% endif %}
+</div>

@@ -1,0 +1,122 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Bricka{% endblock %} — CRM</title>
+
+    {# Bricolage Grotesque — pesos 300 400 500 600 #}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'css/bricka.css' %}">
+</head>
+
+<body
+    class="bg-background font-sans text-on-surface antialiased"
+    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+    <div class="flex h-screen">
+
+        {# ── Sidebar — desktop only ───────────────────────────────── #}
+        <aside class="hidden md:flex md:flex-col w-sidebar shrink-0 bg-primary">
+
+            {# Logo #}
+            <div class="flex items-center gap-3 px-6 h-16 shrink-0 border-b border-white/10">
+                {% include "icons/building2.html" with size="20" %}
+                <span class="text-[18px] font-semibold tracking-tight text-cream">Bricka</span>
+            </div>
+
+            {# Navegación principal #}
+            {% with app=request.resolver_match.app_name %}
+            <nav class="flex flex-col gap-3 px-3 py-4 flex-1 overflow-y-auto">
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                        {% if app == 'dashboard' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
+                    {% include "icons/home.html" with size="17" %}
+                    Inicio
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                        {% if app == 'properties' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
+                    {% include "icons/building2.html" with size="17" %}
+                    Propiedades
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                        {% if app == 'contacts' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
+                    {% include "icons/users.html" with size="17" %}
+                    Contactos
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                        {% if app == 'listings' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
+                    {% include "icons/megaphone.html" with size="17" %}
+                    Publicaciones
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                        {% if app == 'contracts' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
+                    {% include "icons/file-text.html" with size="17" %}
+                    Contratos
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                        {% if app == 'billing' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
+                    {% include "icons/receipt.html" with size="17" %}
+                    Facturación
+                </a>
+
+            </nav>
+
+            {# Configuración — pie del sidebar #}
+            <div class="px-3 py-4 shrink-0 border-t border-white/10">
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                        {% if app == 'settings' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
+                    {% include "icons/settings.html" with size="17" %}
+                    Configuración
+                </a>
+            </div>
+            {% endwith %}
+
+        </aside>
+
+        {# ── Content area ─────────────────────────────────────────── #}
+        <div class="flex flex-col flex-1 min-w-0 overflow-hidden relative">
+
+            {# Page header — siempre visible, no scrollea #}
+            <header class="shrink-0 z-10 relative flex items-center justify-between gap-4 px-6 h-16 bg-background border-b border-outline">
+                <div class="flex items-center gap-3 min-w-0">
+                    {% block page_title %}{% endblock %}
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    {% block page_actions %}{% endblock %}
+                </div>
+            </header>
+
+            {# Área de contenido con scroll propio #}
+            <main class="flex-1 min-h-0 overflow-y-auto px-6 py-6 pb-24 md:pb-6">
+                {% block content %}{% endblock %}
+            </main>
+            <div id="slide-over-container"></div>
+
+        </div>
+
+    </div>
+
+    {# ── Bottom nav — mobile only ─────────────────────────────────── #}
+    
+
+    {# ── Scripts ──────────────────────────────────────────────────── #}
+    {# HTMX — defer para no bloquear render #}
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+    {# Alpine.js — defer obligatorio, debe evaluarse post-DOM #}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+    {# Flowbite — inicializa componentes después del DOM #}
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

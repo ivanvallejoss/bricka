@@ -1,0 +1,13 @@
+{
+  "name": "bricka",
+  "private": true,
+  "scripts": {
+    "dev": "bunx @tailwindcss/cli -i ./static/src/input.css -o ./static/css/bricka.css --watch",
+    "build": "bunx @tailwindcss/cli -i ./static/src/input.css -o ./static/css/bricka.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "flowbite": "^3.0.0"
+  }
+}

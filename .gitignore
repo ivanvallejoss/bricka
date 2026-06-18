@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.prod
+staticfiles/
+media/
+*.log
+.DS_Store
+node_modules/
+static/css/bricka.css
+staticfiles/
+.vscode/
+.vscode

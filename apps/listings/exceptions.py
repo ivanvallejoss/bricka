@@ -1,0 +1,2 @@
+class ListingValidationError(Exception):
+    pass

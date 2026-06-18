@@ -1,0 +1,2 @@
+class DocumentValidationError(Exception):
+    pass

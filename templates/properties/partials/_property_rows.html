@@ -1,0 +1,179 @@
+{% comment %}
+    Partial de filas de propiedad.
+    Usado en dos contextos:
+    1. Include inicial en property_list.html (request.htmx = False)
+    2. Respuesta HTMX a cambios de filtro y paginación infinita (request.htmx = True)
+
+    En contexto HTMX, el OOB actualiza el counter fuera del tbody.
+    HTMX extrae el elemento oob antes de insertar las filas — el tbody
+    recibe solo <tr>, que es HTML válido.
+{% endcomment %}
+
+{% if request.htmx %}
+    <span id="property-counter" hx-swap-oob="true">
+        {{ total_count }} propiedad{{ total_count|pluralize:"es" }}
+    </span>
+{% endif %}
+
+{% for ctx in properties %}
+    {% with property=ctx.property %}
+        <tr
+        data-slide-url="{% url 'properties:slide_over' property.pk %}"
+        data-detail-url="{% url 'properties:detail' property.pk %}"
+        class="group border-b border-outline last:border-0 transition-colors
+        hover:bg-surface-container-lowest cursor-pointer"
+        @click="
+            window.innerWidth >= 768
+                ? htmx.ajax('GET', $el.dataset.slideUrl, { target: '#slide-over-container', swap: 'innerHTML' })
+                : (window.location.href = $el.dataset.detailUrl)
+        ">
+        
+            {# ── Thumbnail ─────────────────────────────────────────── #}
+            <td class="py-3 pl-4">
+                {% if ctx.cover_url %}
+                    <img
+                    src="{{ ctx.cover_url }}"
+                        alt="{{ property.title|default:property.address_line }}"
+                        loading="lazy"
+                        class="w-10 h-10 rounded object-cover shrink-0 bg-surface-container">
+                {% else %}
+                <div class="w-10 h-10 rounded bg-surface-container flex items-center justify-center shrink-0">
+                    {% include "icons/building2.html" with size="16" class="text-on-surface-variant" %}
+                    </div>
+                    {% endif %}
+            </td>
+            
+            {# ── Título / Dirección ────────────────────────────────── #}
+            <td class="py-3 px-3 min-w-0">
+                <p class="text-sm font-medium text-on-surface truncate">
+                    {{ property.title|default:property.address_line }}
+                </p>
+                {% if property.title %}
+                <p class="text-xs text-on-surface-variant truncate mt-0.5">
+                    {{ property.address_line }}
+                    </p>
+                {% endif %}
+            </td>
+            
+            {# ── Badges ────────────────────────────────────────────── #}
+            <td class="py-3 px-3 pr-20">
+                <div class="flex flex-col gap-1.5 items-center">
+                    
+                    {# Badge 1 — Estado del modelo #}
+                    {% if property.status == 'AVAILABLE' %}
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">
+                            Disponible
+                        </span>
+                    {% elif property.status == 'RENTED' %}
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-warning-bg text-warning-text">
+                            Alquilada
+                        </span>
+                    {% elif property.status == 'SOLD' %}
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">
+                            Vendida
+                        </span>
+                    {% elif property.status == 'UNAVAILABLE' %}
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">
+                            No disponible
+                        </span>
+                    {% endif %}
+                    
+                    {# Badge 2 — Contextual (computado por selector.py) #}
+                    {% if property.contextual_badge %}
+                        {% with badge=property.contextual_badge %}
+                            <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
+                            {% if badge.style == 'success' %}bg-success-bg text-success-text
+                            {% elif badge.style == 'warning' %}bg-warning-bg text-warning-text
+                            {% elif badge.style == 'danger' %}bg-danger-bg text-danger-text
+                            {% else %}bg-surface-container text-on-surface-variant
+                            {% endif %}">
+                                {{ badge.text }}
+                            </span>
+                        {% endwith %}
+                    {% endif %}
+                
+                </div>
+            </td>
+
+            {# ── Precio ────────────────────────────────────────────── #}
+            <td class="py-3 px-3 pr-center text-center">
+                {% if ctx.display_price %}
+                <p class="text-sm font-medium text-on-surface tabular-nums">
+                    ${{ ctx.display_price|floatformat:0 }}
+                </p>
+                {% else %}
+                <p class="text-sm text-on-surface-variant">—</p>
+                {% endif %}
+            </td>
+
+            {# ── Acciones hover — desktop only ─────────────────────── #}
+            <td class="py-3 pr-4 hidden md:table-cell">
+                <div class="flex items-center justify-end gap-1
+                opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                
+                {# Placeholder de acciones adicionales #}
+                {% comment %} 
+                
+                DEBIDO AL SLIDE-OVER y su funcionalidad de acciones rapidas, no le veo sentido a este boton.
+                
+                <button
+                type="button"
+                @click.stop
+                title="Más acciones"
+                class="p-1.5 rounded text-on-surface-variant hover:text-on-surface
+                hover:bg-surface-container transition-colors">
+                {% include "icons/more-horizontal.html" with size="14" %}
+                </button> 
+                {% endcomment %}
+                
+                {# Ver — abre slide-over #}
+                    <button
+                    type="button"
+                    @click.stop="htmx.ajax('GET', $el.closest('tr').dataset.slideUrl, { target: '#slide-over-container', swap: 'innerHTML' })"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium
+                    bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors">
+                    Ver
+                    {% include "icons/arrow-right.html" with size="12" %}
+                    </button>
+
+                </div>
+            </td>
+
+        </tr>
+        {% endwith %}
+        
+    {% empty %}
+    {# ── Empty state ───────────────────────────────────────────── #}
+    <tr>
+        <td colspan="5" class="py-20 text-center">
+            <p class="text-sm text-on-surface-variant">
+                No hay propiedades que coincidan con los filtros aplicados.
+            </p>
+        </td>
+    </tr>
+
+{% endfor %}
+
+{# ── Scroll sentinel — infinite scroll ────────────────────── #}
+{% comment %}
+    Cuando el sentinel entra al viewport (revealed), HTMX carga la siguiente página.
+    La respuesta es otro _property_rows.html que reemplaza este sentinel
+    con las nuevas filas + un nuevo sentinel (o nada si es la última página).
+    next_page_url es construida por la view: incluye tab, status, q y page=N.
+{% endcomment %}
+{% if page_obj.has_next %}
+<tr
+    hx-get="{{ next_page_url }}"
+    hx-trigger="revealed"
+    hx-target="this"
+    hx-swap="outerHTML">
+    <td colspan="5" class="py-4 text-center">
+        <div class="inline-flex items-center gap-2 text-xs text-on-surface-variant">
+            <div class="w-3.5 h-3.5 border border-primary-container border-t-transparent
+                        rounded-full animate-spin">
+            </div>
+            Cargando más...
+        </div>
+    </td>
+</tr>
+{% endif %}

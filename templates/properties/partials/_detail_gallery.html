@@ -1,0 +1,78 @@
+{% comment %}
+Galería de fotos — grid + lightbox con navegación entre imágenes.
+gallery_urls (lista de strings) y gallery_urls_json (mismo array serializado)
+vienen de property_detail view. Sin requests adicionales por foto —
+todas las URLs ya están resueltas en la carga inicial de la página.
+{% endcomment %}
+<section
+    x-data='{
+        photos: {{ gallery_urls_json|safe }},
+        activeIndex: null,
+        open(i) { this.activeIndex = i },
+        close() { this.activeIndex = null },
+        next() { this.activeIndex = (this.activeIndex + 1) % this.photos.length },
+        prev() { this.activeIndex = (this.activeIndex - 1 + this.photos.length) % this.photos.length }
+    }'
+    class="bg-surface border border-outline rounded-md p-5">
+
+    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+        Fotos
+    </p>
+
+    {% if gallery_urls %}
+        <div class="grid grid-cols-3 md:grid-cols-4 gap-2">
+            {% for url in gallery_urls %}
+            <button type="button" @click="open({{ forloop.counter0 }})"
+                    class="aspect-square rounded-md overflow-hidden bg-surface-container hover:opacity-90 transition-opacity">
+                <img src="{{ url }}" loading="lazy" class="w-full h-full object-cover">
+            </button>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-sm text-on-surface-variant">Sin fotos cargadas.</p>
+    {% endif %}
+
+    {# Lightbox con navegación #}
+    <div
+        x-show="activeIndex !== null"
+        x-cloak
+        @keydown.escape.window="close()"
+        @keydown.arrow-right.window="next()"
+        @keydown.arrow-left.window="prev()"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="close()"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-primary/90 p-6">
+
+        <button type="button" @click.stop="prev()"
+                class="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full
+                       bg-surface/20 text-white hover:bg-surface/30 transition-colors">
+            {% include "icons/chevron-left.html" with size="22" %}
+        </button>
+
+        <img @click.stop :src="photos[activeIndex]"
+             class="max-w-4xl w-full max-h-[80vh] object-contain rounded-md">
+
+        <button type="button" @click.stop="next()"
+                class="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full
+                       bg-surface/20 text-white hover:bg-surface/30 transition-colors">
+            {% include "icons/chevron-right.html" with size="22" %}
+        </button>
+
+        <button type="button" @click="close()"
+                class="absolute top-4 right-4 p-1.5 rounded-full bg-surface/80
+                       text-on-surface hover:bg-surface transition-colors">
+            {% include "icons/x.html" with size="16" %}
+        </button>
+
+        <p class="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/70"
+           x-text="(activeIndex + 1) + ' / ' + photos.length">
+        </p>
+
+    </div>
+
+</section>

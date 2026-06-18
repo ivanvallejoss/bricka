@@ -1,0 +1,101 @@
+{% comment %}
+Misma lógica que _slide_over_documents.html — grid más ancho
+porque hay más espacio horizontal disponible en la página completa.
+{% endcomment %}
+<div class="bg-surface border border-outline rounded-md p-5" x-data="{ selectedImage: null }">
+
+    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+        Documentos
+    </p>
+
+    {% if documents %}
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+        {% for ctx in documents %}
+        {% with doc=ctx.document %}
+
+            {% if ctx.file_category == 'image' %}
+            <button type="button"
+                    @click="selectedImage = { url: '{{ ctx.signed_url }}', name: '{{ doc.original_filename|escapejs }}' }"
+                    class="group flex flex-col rounded-md border border-outline overflow-hidden
+                           hover:border-outline-variant hover:shadow-sm transition-all text-left">
+                <div class="aspect-square w-full bg-surface-container overflow-hidden">
+                    <img src="{{ ctx.signed_url }}" alt="{{ doc.original_filename }}" loading="lazy"
+                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                </div>
+                <div class="px-2 py-1.5 border-t border-outline">
+                    <p class="text-[10px] text-on-surface-variant truncate">{{ doc.original_filename }}</p>
+                </div>
+            </button>
+
+            {% elif ctx.file_category == 'pdf' %}
+            <a href="{{ ctx.signed_url }}" target="_blank" rel="noopener noreferrer"
+               class="group flex flex-col rounded-md border border-outline overflow-hidden
+                      hover:border-outline-variant hover:shadow-sm transition-all">
+                <div class="aspect-square w-full bg-danger-bg flex flex-col items-center justify-center gap-1">
+                    {% include "icons/file-text.html" with size="24" class="text-danger-text" %}
+                    <span class="text-[10px] font-semibold text-danger-text uppercase tracking-wide">PDF</span>
+                </div>
+                <div class="px-2 py-1.5 border-t border-outline">
+                    <p class="text-[10px] text-on-surface-variant truncate">{{ doc.original_filename }}</p>
+                </div>
+            </a>
+
+            {% elif ctx.file_category == 'word' %}
+            <a href="{{ ctx.signed_url }}" download="{{ doc.original_filename }}"
+               class="group flex flex-col rounded-md border border-outline overflow-hidden
+                      hover:border-outline-variant hover:shadow-sm transition-all">
+                <div class="aspect-square w-full bg-alquiler-bg flex flex-col items-center justify-center gap-1">
+                    {% include "icons/file-text.html" with size="24" class="text-alquiler-text" %}
+                    <span class="text-[10px] font-semibold text-alquiler-text uppercase tracking-wide">DOC</span>
+                </div>
+                <div class="px-2 py-1.5 border-t border-outline">
+                    <p class="text-[10px] text-on-surface-variant truncate">{{ doc.original_filename }}</p>
+                </div>
+            </a>
+
+            {% else %}
+            <a href="{{ ctx.signed_url }}" download="{{ doc.original_filename }}"
+               class="group flex flex-col rounded-md border border-outline overflow-hidden
+                      hover:border-outline-variant hover:shadow-sm transition-all">
+                <div class="aspect-square w-full bg-surface-container flex flex-col items-center justify-center gap-1">
+                    {% include "icons/file-text.html" with size="24" class="text-on-surface-variant" %}
+                    <span class="text-[10px] font-medium text-on-surface-variant uppercase tracking-wide">
+                        {{ doc.content_type|slice:"12:" }}
+                    </span>
+                </div>
+                <div class="px-2 py-1.5 border-t border-outline">
+                    <p class="text-[10px] text-on-surface-variant truncate">{{ doc.original_filename }}</p>
+                </div>
+            </a>
+            {% endif %}
+
+        {% endwith %}
+        {% endfor %}
+        </div>
+
+        <div x-show="selectedImage !== null" x-cloak
+             x-transition:enter="transition ease-out duration-150"
+             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-100"
+             x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+             @click="selectedImage = null" @keydown.escape.window="selectedImage = null"
+             class="fixed inset-0 z-50 flex items-center justify-center bg-primary/80 p-6">
+            <div @click.stop class="relative max-w-3xl w-full">
+                <img x-bind:src="selectedImage ? selectedImage.url : ''"
+                     x-bind:alt="selectedImage ? selectedImage.name : ''"
+                     class="w-full max-h-[80vh] object-contain rounded-md shadow-xl">
+                <button type="button" @click="selectedImage = null"
+                        class="absolute -top-3 -right-3 p-1.5 rounded-full bg-surface
+                               text-on-surface shadow-md hover:bg-surface-container transition-colors">
+                    {% include "icons/x.html" with size="16" %}
+                </button>
+                <p x-text="selectedImage ? selectedImage.name : ''"
+                   class="mt-2 text-center text-xs text-white/70 truncate"></p>
+            </div>
+        </div>
+
+    {% else %}
+        <p class="text-sm text-on-surface-variant">Sin documentos asociados.</p>
+    {% endif %}
+
+</div>

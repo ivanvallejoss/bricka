@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [test]  # solo deployea si CI pasa
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          script: |
+            set -e
+            cd /var/www/bricka
+
+            echo "→ Actualizando código"
+            git pull origin main
+
+            echo "→ Instalando dependencias"
+            source .venv/bin/activate
+            pip install -r requirements.txt --quiet
+
+            echo "→ Aplicando migraciones"
+            python manage.py migrate --no-input
+
+            echo "→ Colectando estáticos"
+            python manage.py collectstatic --no-input --clear
+
+            echo "→ Reiniciando servicios"
+            sudo systemctl restart gunicorn
+            sudo systemctl restart celery
+            sudo systemctl restart celerybeat
+
+            echo "→ Deploy completado"

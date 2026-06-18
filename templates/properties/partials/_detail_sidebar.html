@@ -1,0 +1,132 @@
+{% comment %}
+Sidebar de detalle — sticky en desktop, inline en mobile (ver property_detail.html).
+Todo carga inmediata. property y listings ya vienen resueltos desde property_detail view.
+{% endcomment %}
+<div class="space-y-4">
+
+    {# Estado + precio(s) #}
+    <div class="bg-surface border border-outline rounded-md p-4">
+        <div class="flex items-center gap-1.5 flex-wrap mb-3">
+            {% if property.status == 'AVAILABLE' %}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">Disponible</span>
+            {% elif property.status == 'RENTED' %}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-warning-bg text-warning-text">Alquilada</span>
+            {% elif property.status == 'SOLD' %}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">Vendida</span>
+            {% elif property.status == 'UNAVAILABLE' %}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">No disponible</span>
+            {% endif %}
+            {% if property.has_rent_listing %}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-alquiler-bg text-alquiler-text">Alquiler</span>
+            {% endif %}
+            {% if property.has_sale_listing %}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">Venta</span>
+            {% endif %}
+        </div>
+
+        {% for listing in listings %}
+            <div class="flex items-center justify-between py-1.5 {% if not forloop.last %}border-b border-outline{% endif %}">
+                <span class="text-xs text-on-surface-variant">
+                    {% if listing.operation_type == 'sale' %}Venta
+                    {% elif listing.operation_type == 'rent' %}Alquiler
+                    {% elif listing.operation_type == 'temporary_rent' %}Alq. temporario
+                    {% endif %}
+                </span>
+                <span class="text-sm font-medium text-on-surface tabular-nums">${{ listing.price|floatformat:0 }}</span>
+            </div>
+        {% empty %}
+            <p class="text-sm text-on-surface-variant">Sin listings activos.</p>
+        {% endfor %}
+    </div>
+
+    {# Características #}
+    <div class="bg-surface border border-outline rounded-md p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Características
+        </p>
+        <div class="grid grid-cols-2 gap-y-2.5 gap-x-3">
+            {% if property.property_type %}
+            <div>
+                <p class="text-[11px] text-on-surface-variant">Tipo</p>
+                <p class="text-sm font-medium text-on-surface">{{ property.get_property_type_display }}</p>
+            </div>
+            {% endif %}
+            {% if property.area_m2 %}
+            <div>
+                <p class="text-[11px] text-on-surface-variant">Superficie</p>
+                <p class="text-sm font-medium text-on-surface">{{ property.area_m2|floatformat:0 }} m²</p>
+            </div>
+            {% endif %}
+            {% if property.bedrooms is not None %}
+            <div>
+                <p class="text-[11px] text-on-surface-variant">Dormitorios</p>
+                <p class="text-sm font-medium text-on-surface">{{ property.bedrooms }}</p>
+            </div>
+            {% endif %}
+            {% if property.bathrooms is not None %}
+            <div>
+                <p class="text-[11px] text-on-surface-variant">Baños</p>
+                <p class="text-sm font-medium text-on-surface">{{ property.bathrooms }}</p>
+            </div>
+            {% endif %}
+            {% if property.year_built %}
+            <div>
+                <p class="text-[11px] text-on-surface-variant">Año</p>
+                <p class="text-sm font-medium text-on-surface">{{ property.year_built }}</p>
+            </div>
+            {% endif %}
+            {% if property.neighborhood %}
+            <div>
+                <p class="text-[11px] text-on-surface-variant">Barrio</p>
+                <p class="text-sm font-medium text-on-surface">{{ property.neighborhood }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if property.features %}
+        <div class="mt-3 flex flex-wrap gap-1.5">
+            {% for feature in property.features %}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant border border-outline">
+                    {{ feature }}
+                </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {# Propietario #}
+    <div class="bg-surface border border-outline rounded-md p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Propietario
+        </p>
+        {% if property.owner_contact %}
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0">
+                    {% include "icons/users.html" with size="15" class="text-primary-container" %}
+                </div>
+                <p class="text-sm font-medium text-on-surface truncate">{{ property.owner_contact.full_name }}</p>
+            </div>
+        {% else %}
+            <p class="text-sm text-on-surface-variant">Sin propietario asignado.</p>
+        {% endif %}
+    </div>
+
+    {# Acciones #}
+    <div class="flex items-center gap-2">
+        {% if property.status == 'RENTED' %}
+        <button type="button"
+                class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded
+                       bg-primary-container text-on-primary text-sm font-medium hover:bg-primary transition-colors">
+            {% include "icons/dollar-sign.html" with size="14" %}
+            Cobrar
+        </button>
+        {% endif %}
+        <button type="button" disabled title="Sin comprobantes"
+                class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded
+                       border border-outline text-sm font-medium text-on-surface-variant opacity-50 cursor-not-allowed">
+            {% include "icons/download.html" with size="14" %}
+            PDF
+        </button>
+    </div>
+
+</div>

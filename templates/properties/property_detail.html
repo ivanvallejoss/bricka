@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ property.title|default:property.address_line }}{% endblock %}
+
+{% block page_title %}
+    <a href="{% url 'properties:list' %}"
+       class="flex items-center gap-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors">
+        {% include "icons/arrow-left.html" with size="16" %}
+        Propiedades
+    </a>
+{% endblock %}
+
+{% block content %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+
+        {# ── Columna principal ──────────────────────────────────── #}
+        <div class="space-y-6 min-w-0">
+
+            {# Hero — solo visual, cover + título #}
+            <div class="relative h-64 md:h-72 rounded-md overflow-hidden bg-surface-container">
+                {% if cover_url %}
+                    <img src="{{ cover_url }}"
+                         alt="{{ property.title|default:property.address_line }}"
+                         class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-linear-to-t from-primary/80 via-primary/10 to-transparent"></div>
+                {% else %}
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        {% include "icons/building2.html" with size="48" class="text-on-surface-variant/40" %}
+                    </div>
+                {% endif %}
+
+                <div class="absolute bottom-0 left-0 right-0 px-6 pb-5">
+                    <h1 class="text-[22px] font-semibold leading-snug
+                              {% if cover_url %}text-white{% else %}text-on-surface{% endif %}">
+                        {{ property.title|default:property.address_line }}
+                    </h1>
+                    {% if property.title %}
+                        <p class="text-sm mt-0.5 {% if cover_url %}text-white/80{% else %}text-on-surface-variant{% endif %}">
+                            {{ property.address_line }}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Sidebar — visible solo en mobile, justo después del hero #}
+            <div class="lg:hidden">
+                {% include "properties/partials/_detail_sidebar.html" %}
+            </div>
+
+            {# Descripción #}
+            <section x-data="{ expanded: false }" class="bg-surface border border-outline rounded-md p-5">
+                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+                    Descripción
+                </p>
+                {% if property.description %}
+                    <p class="text-sm text-on-surface leading-relaxed"
+                       :class="expanded ? '' : 'line-clamp-4'">
+                        {{ property.description|linebreaksbr }}
+                    </p>
+                    <button type="button" @click="expanded = !expanded"
+                            class="mt-2 text-xs font-medium text-primary-container hover:underline"
+                            x-text="expanded ? 'Ver menos' : 'Ver más'">
+                    </button>
+                {% else %}
+                    <p class="text-sm text-on-surface-variant">Sin descripción.</p>
+                {% endif %}
+            </section>
+
+            {# Galería con lightbox y navegación #}
+            {% include "properties/partials/_detail_gallery.html" %}
+
+            {# Publicaciones — lazy #}
+            <div hx-get="{% url 'properties:detail_publications' property.pk %}"
+                 hx-trigger="revealed"
+                 hx-swap="outerHTML"
+                 class="bg-surface border border-outline rounded-md p-5">
+                {% include "properties/partials/_slide_over_loading.html" with label="publicaciones" %}
+            </div>
+
+            {# Documentos — lazy #}
+            <div hx-get="{% url 'properties:detail_documents' property.pk %}"
+                 hx-trigger="revealed"
+                 hx-swap="outerHTML"
+                 class="bg-surface border border-outline rounded-md p-5">
+                {% include "properties/partials/_slide_over_loading.html" with label="documentos" %}
+            </div>
+
+            {# Facturación — placeholder hasta tener selectors de contratos #}
+            <section class="bg-surface border border-outline rounded-md p-5">
+                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+                    Facturación
+                </p>
+                <p class="text-sm text-on-surface-variant">
+                    Disponible cuando se implemente la sección de contratos.
+                </p>
+            </section>
+
+        </div>
+
+        {# ── Sidebar — desktop only, sticky ───────────────────────── #}
+        <div class="hidden lg:block">
+            <div class="sticky top-6">
+                {% include "properties/partials/_detail_sidebar.html" %}
+            </div>
+        </div>
+
+    </div>
+
+{% endblock %}

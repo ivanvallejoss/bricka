@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Propiedades{% endblock %}
+
+{% block page_title %}
+    <h1 class="text-[20px] font-semibold tracking-tight text-on-surface">Propiedades</h1>
+{% endblock %}
+
+{% block page_actions %}
+    <a href="#"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded bg-primary-container text-on-primary
+              text-sm font-medium transition-colors hover:bg-primary">
+        {% include "icons/plus.html" with size="15" %}
+        Nueva propiedad
+    </a>
+{% endblock %}
+
+{% block content %}
+
+    <div class="space-y-4">
+
+        {# ── Filtros ──────────────────────────────────────────────── #}
+        {# x-data vive en el <form> — this.$el en métodos Alpine = el <form> mismo. $el.form en el handler del input = el <form> contenedor (HTMLInputElement.form). Ambos llaman requestSubmit() que dispara el evento submit que HTMX intercepta.#}
+
+        {% with tab=current_tab|default:"all" status=current_status|default:"all" %}
+        <form
+            x-data="{
+                tab:    '{{ tab }}',
+                status: '{{ status }}',
+
+                setTab(t) {
+                    this.tab    = t;
+                    this.status = 'all';
+                    this.$nextTick(() => this.$el.requestSubmit());
+                },
+
+                setStatus(s) {
+                    this.status = s;
+                    this.$nextTick(() => this.$el.requestSubmit());
+                },
+
+                get pills() {
+                    return {
+                        all:  [
+                            { v: 'all',         l: 'Todas'         },
+                            { v: 'AVAILABLE',   l: 'Disponibles'   },
+                            { v: 'RENTED',      l: 'Alquiladas'    },
+                            { v: 'SOLD',        l: 'Vendidas'      },
+                            { v: 'UNAVAILABLE', l: 'No disponibles'},
+                        ],
+                        rent: [
+                            { v: 'all',       l: 'Todas'        },
+                            { v: 'AVAILABLE', l: 'Disponibles'  },
+                            { v: 'RENTED',    l: 'Alquiladas'   },
+                        ],
+                        sale: [
+                            { v: 'all',       l: 'Todas'       },
+                            { v: 'AVAILABLE', l: 'Disponibles' },
+                            { v: 'SOLD',      l: 'Vendidas'    },
+                        ],
+                    }[this.tab] || [];
+                }
+            }"
+            hx-get="#"
+            hx-target="#property-table-body"
+            hx-swap="innerHTML"
+            hx-push-url="true">
+
+            {# Estado serializado — HTMX los incluye en el GET al hacer submit #}
+            <input type="hidden" name="tab"    :value="tab">
+            <input type="hidden" name="status" :value="status">
+
+            {# Buscador #}
+            <div class="relative mb-4">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant">
+                    {% include "icons/search.html" with size="15" %}
+                </div>
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ search_query|default:'' }}"
+                    @input.debounce.400ms="$el.form.requestSubmit()"
+                    placeholder="Buscar propiedad..."
+                    autocomplete="off"
+                    class="w-full pl-9 pr-4 py-2 text-sm bg-surface border border-outline rounded
+                           focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                           focus:border-primary-container placeholder:text-on-surface-variant
+                           transition-colors">
+            </div>
+
+            {# Fila 1 — Tabs de operación #}
+            <div class="flex items-center gap-1 mb-3">
+                <button type="button" @click="setTab('all')"
+                        :class="tab === 'all'
+                            ? 'bg-primary-container text-on-primary'
+                            : 'bg-surface text-on-surface-variant border border-outline hover:bg-surface-container-low'"
+                        class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">
+                    Todas
+                </button>
+                <button type="button" @click="setTab('rent')"
+                        :class="tab === 'rent'
+                            ? 'bg-primary-container text-on-primary'
+                            : 'bg-surface text-on-surface-variant border border-outline hover:bg-surface-container-low'"
+                        class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">
+                    Alquiler
+                </button>
+                <button type="button" @click="setTab('sale')"
+                        :class="tab === 'sale'
+                            ? 'bg-primary-container text-on-primary'
+                            : 'bg-surface text-on-surface-variant border border-outline hover:bg-surface-container-low'"
+                        class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">
+                    Venta
+                </button>
+            </div>
+
+            {# Fila 2 — Pills contextuales (Alpine determina cuáles según tab activo) #}
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <template x-for="pill in pills" :key="pill.v">
+                    <button
+                        type="button"
+                        @click="setStatus(pill.v)"
+                        :class="status === pill.v
+                            ? 'bg-surface-container-highest text-on-surface border-transparent'
+                            : 'bg-surface text-on-surface-variant border-outline hover:bg-surface-container-low'"
+                        class="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+                        x-text="pill.l">
+                    </button>
+                </template>
+            </div>
+
+        </form>
+        {% endwith %}
+
+        {# ── Tabla ────────────────────────────────────────────────── #}
+        <div class="bg-surface border border-outline rounded-md overflow-hidden" x-data>
+            <div class="overflow-x-auto">
+                <table class="w-full table-fixed">
+
+                    <colgroup>
+                        <col class="w-14">    {# thumbnail  #}
+                        <col>                  {# propiedad  #}
+                        <col class="w-52">    {# estado     #}
+                        <col class="w-28">    {# precio     #}
+                        <col class="w-24">    {# acciones   #}
+                    </colgroup>
+
+                    <thead>
+                        <tr class="border-b border-outline bg-surface-container-low/40">
+                            <th class="py-3 pl-4"></th>
+                            <th class="py-3 px-3 text-left text-[11px] font-medium uppercase
+                                       tracking-[0.07em] text-on-surface-variant">
+                                Propiedad
+                            </th>
+                            <th class="py-3 px-3 pr-20 text-[11px] font-medium uppercase
+                                       tracking-[0.07em] text-on-surface-variant">
+                                Estado
+                            </th>
+                            <th class="py-3 px-3 pr-center text-[11px] font-medium uppercase
+                                       tracking-[0.07em] text-on-surface-variant">
+                                Precio
+                            </th>
+                            <th class="py-3 pr-4 hidden md:table-cell"></th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="property-table-body">
+                        {% include "properties/partials/_property_rows.html" %}
+                    </tbody>
+
+                </table>
+            </div>
+        </div>
+
+        {# ── Counter ──────────────────────────────────────────────── #}
+        <p class="text-xs text-on-surface-variant px-1">
+            <span id="property-counter">{{ total_count }} propiedad{{ total_count|pluralize:"es" }}</span>
+        </p>
+
+    </div>
+
+{% endblock %}
