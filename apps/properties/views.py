@@ -11,6 +11,7 @@ from apps.listings.selectors import get_listings_for_property
 
 from apps.documents.selectors import get_document_list, DocumentFilters
 from apps.documents.context import DocumentContext
+from apps.documents.utils import categorize_document
 
 from apps.common.storage import build_media_url, generate_document_url
 

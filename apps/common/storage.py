@@ -58,17 +58,3 @@ def generate_document_url(r2_key: str, expiration: int = 900) -> str:
         },
         ExpiresIn=expiration,
     )
-
-
-def categorize_document(content_type: str) -> str:
-    """
-    Categoría visual para el template, derivada del content_type del archivo.
-    Retorna: 'image' | 'pdf' | 'word' | 'other'
-    """
-    if content_type.startswith("image/"):
-        return "image"
-    if content_type == "application/pdf":
-        return "pdf"
-    if "word" in content_type or content_type == "application/msword":
-        return "word"
-    return "other"
