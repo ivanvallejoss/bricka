@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Prefetch
 
 from .choices import ContractStatus
 from .models import RentalContract, RentAdjustment
@@ -154,4 +154,13 @@ def calculate_mora(contract: RentalContract, as_of: date) -> MoraCalculation | N
         days_overdue=days_overdue,
         daily_rate=daily_rate,
         total_amount=total_amount,
+    )
+
+
+def active_contracts_prefetch():
+    """Funcion para prefetchear los contratos activos para el template"""
+    return Prefetch(
+        "rental_contracts",
+        queryset=RentalContract.objects.filter(status=ContractStatus.ACTIVE),
+        to_attr="active_contracts_list",
     )

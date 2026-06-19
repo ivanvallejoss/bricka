@@ -7,6 +7,7 @@ from apps.properties.models import Property, PropertyMedia
 
 from apps.listings.selectors import published_listing_subquery, active_listings_prefetch
 
+from apps.contracts.selectors import active_contracts_prefetch
 
 @dataclass
 class PropertyFilters:
@@ -25,7 +26,8 @@ def get_property_list(
             queryset=PropertyMedia.objects.filter(is_cover=True),
             to_attr="cover_media_list",
         ),
-        active_listings_prefetch(), # <- building block de listing
+        active_listings_prefetch(),
+        active_contracts_prefetch(),
     ).annotate(
         has_sale_listing=published_listing_subquery("sale"),
         has_rent_listing=published_listing_subquery("rent"),

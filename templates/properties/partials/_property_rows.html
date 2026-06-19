@@ -79,8 +79,8 @@
                     {% endif %}
                     
                     {# Badge 2 — Contextual (computado por selector.py) #}
-                    {% if property.contextual_badge %}
-                        {% with badge=property.contextual_badge %}
+                    {% if ctx.contextual_badge %}
+                        {% with badge=ctx.contextual_badge %}
                             <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
                             {% if badge.style == 'success' %}bg-success-bg text-success-text
                             {% elif badge.style == 'warning' %}bg-warning-bg text-warning-text

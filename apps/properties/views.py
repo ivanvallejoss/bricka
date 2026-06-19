@@ -1,5 +1,7 @@
 import json
 
+from datetime import date
+
 from django.shortcuts import render
 from django.http import Http404
 
@@ -12,6 +14,10 @@ from apps.listings.selectors import get_listings_for_property
 from apps.documents.selectors import get_document_list, DocumentFilters
 from apps.documents.context import DocumentContext
 from apps.documents.utils import categorize_document
+
+from apps.billing.selectors import get_rental_payment_status
+from apps.billing.choices import PaymentStatus
+from apps.properties.contexts import BadgeContext
 
 from apps.common.storage import build_media_url, generate_document_url
 
@@ -26,6 +32,20 @@ def property_list(request):
 
     properties = list(get_property_list(filters))
 
+    all_contracts = [c for prop in properties for c in prop.active_contracts_list]
+    payment_statuses = get_rental_payment_status(all_contracts, as_of=date.today())
+
+    _BADGE_MAP = {
+        PaymentStatus.PAID:    BadgeContext(text="Pago",      style="success"),
+        PaymentStatus.PENDING: BadgeContext(text="Pendiente", style="warning"),
+        PaymentStatus.OVERDUE: BadgeContext(text="En mora",   style="danger"),
+    }
+    prop_badges = {
+        c.property_id: _BADGE_MAP[payment_statuses[c.id]]
+        for c in all_contracts
+        if payment_statuses.get(c.id) in _BADGE_MAP
+    }
+
     property_contexts = [
         PropertyListContext(
             property=prop,
@@ -35,6 +55,7 @@ def property_list(request):
                 (l.price for l in prop.active_listings if not op_type or l.operation_type == op_type),
                 None,
             ),
+            contextual_badge=prop_badges.get(prop.id),
         )
         for prop in properties
     ]
