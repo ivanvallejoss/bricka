@@ -87,13 +87,13 @@ Secciones internas usan hx-trigger="revealed" para carga lazy.
             <div class="flex items-center justify-between gap-3 px-5 py-3">
 
                 <div class="flex items-center gap-1.5 flex-wrap">
-                    {% if property.status == 'AVAILABLE' %}
+                    {% if property.status == 'available' %}
                         <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">Disponible</span>
-                    {% elif property.status == 'RENTED' %}
+                    {% elif property.status == 'rented' %}
                         <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-warning-bg text-warning-text">Alquilada</span>
-                    {% elif property.status == 'SOLD' %}
+                    {% elif property.status == 'sold' %}
                         <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">Vendida</span>
-                    {% elif property.status == 'UNAVAILABLE' %}
+                    {% elif property.status == 'unavailable' %}
                         <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">No disponible</span>
                     {% endif %}
                     {% if property.has_rent_listing %}
@@ -201,7 +201,7 @@ Secciones internas usan hx-trigger="revealed" para carga lazy.
             </div>
 
             {# Cobro — solo si alquilada #}
-            {% if property.status == 'RENTED' %}
+            {% if property.status == 'rented' %}
             <div
                 hx-get="{% url 'properties:slide_over_billing' property.pk %}"
                 hx-trigger="revealed"
@@ -233,7 +233,7 @@ Secciones internas usan hx-trigger="revealed" para carga lazy.
         {# ── Action bar fija ──────────────────────────────────── #}
         <div class="shrink-0 flex items-center gap-2 px-5 py-4 border-t border-outline bg-surface">
 
-            {% if property.status == 'RENTED' %}
+            {% if property.status == 'rented' %}
             <button
                 type="button"
                 class="inline-flex items-center gap-2 px-3 py-2 rounded bg-primary-container

@@ -7,13 +7,13 @@ Todo carga inmediata. property y listings ya vienen resueltos desde property_det
     {# Estado + precio(s) #}
     <div class="bg-surface border border-outline rounded-md p-4">
         <div class="flex items-center gap-1.5 flex-wrap mb-3">
-            {% if property.status == 'AVAILABLE' %}
+            {% if property.status == 'available' %}
                 <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">Disponible</span>
-            {% elif property.status == 'RENTED' %}
+            {% elif property.status == 'rented' %}
                 <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-warning-bg text-warning-text">Alquilada</span>
-            {% elif property.status == 'SOLD' %}
+            {% elif property.status == 'sold' %}
                 <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">Vendida</span>
-            {% elif property.status == 'UNAVAILABLE' %}
+            {% elif property.status == 'unavailable' %}
                 <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">No disponible</span>
             {% endif %}
             {% if property.has_rent_listing %}
@@ -113,7 +113,7 @@ Todo carga inmediata. property y listings ya vienen resueltos desde property_det
 
     {# Acciones #}
     <div class="flex items-center gap-2">
-        {% if property.status == 'RENTED' %}
+        {% if property.status == 'rented' %}
         <button type="button"
                 class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded
                        bg-primary-container text-on-primary text-sm font-medium hover:bg-primary transition-colors">

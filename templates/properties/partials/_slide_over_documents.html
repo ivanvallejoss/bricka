@@ -50,12 +50,12 @@ antes de pasar el queryset al template.
 
             {% elif ctx.file_category == 'pdf' %}
             {# PDF — nueva pestaña #}
-            
+{% comment %}             
                 href="{{ ctx.signed_url }}"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="group flex flex-col rounded-md border border-outline overflow-hidden
-                       hover:border-outline-variant hover:shadow-sm transition-all">
+                       hover:border-outline-variant hover:shadow-sm transition-all"> {% endcomment %}
 
                 <div class="aspect-square w-full bg-danger-bg flex flex-col items-center justify-center gap-1">
                     {% include "icons/file-text.html" with size="24" class="text-danger-text" %}
@@ -68,11 +68,11 @@ antes de pasar el queryset al template.
 
             {% elif ctx.file_category == 'word' %}
             {# Word — descarga #}
-            
+{% comment %}             
                 href="{{ ctx.signed_url }}"
                 download="{{ doc.original_filename }}"
                 class="group flex flex-col rounded-md border border-outline overflow-hidden
-                       hover:border-outline-variant hover:shadow-sm transition-all">
+                       hover:border-outline-variant hover:shadow-sm transition-all"> {% endcomment %}
 
                 <div class="aspect-square w-full bg-alquiler-bg flex flex-col items-center justify-center gap-1">
                     {% include "icons/file-text.html" with size="24" class="text-alquiler-text" %}
@@ -86,10 +86,10 @@ antes de pasar el queryset al template.
             {% else %}
             {# Otros formatos — descarga #}
             
-                href="{{ ctx.signed_url }}"
+                {% comment %} href="{{ ctx.signed_url }}"
                 download="{{ doc.original_filename }}"
                 class="group flex flex-col rounded-md border border-outline overflow-hidden
-                       hover:border-outline-variant hover:shadow-sm transition-all">
+                       hover:border-outline-variant hover:shadow-sm transition-all"> {% endcomment %}
 
                 <div class="aspect-square w-full bg-surface-container flex flex-col items-center justify-center gap-1">
                     {% include "icons/file-text.html" with size="24" class="text-on-surface-variant" %}
