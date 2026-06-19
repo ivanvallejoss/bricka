@@ -109,6 +109,7 @@ if DEBUG:
     }
     MEDIA_URL = "/media/"
     MEDIA_ROOT = BASE_DIR / "media"
+    R2_PUBLIC_BASE_URL = env.str("R2_PUBLIC_BASE_URL", default="")
 else:
     STORAGES = {
         "default": {
@@ -118,6 +119,8 @@ else:
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
+    R2_PUBLIC_BASE_URL = env.str("R2_PUBLIC_BASE_URL")
+    
     AWS_ACCESS_KEY_ID = env.str("R2_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = env.str("R2_SECRET_ACCESS_KEY")
     AWS_STORAGE_BUCKET_NAME = env.str("R2_STORAGE_BUCKET_NAME")
