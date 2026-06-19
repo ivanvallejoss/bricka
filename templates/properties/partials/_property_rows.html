@@ -45,7 +45,7 @@
             
             {# ── Título / Dirección ────────────────────────────────── #}
             <td class="py-3 px-3 min-w-0">
-                <p class="text-sm font-medium text-on-surface truncate">
+                <p class="text-[15px] font-medium text-on-surface truncate">
                     {{ property.title|default:property.address_line }}
                 </p>
                 {% if property.title %}
@@ -57,23 +57,23 @@
             
             {# ── Badges ────────────────────────────────────────────── #}
             <td class="py-3 px-3 pr-20">
-                <div class="flex flex-col gap-1.5 items-center">
+                <div class="flex flex-row gap-1.5 items-start justify-center">
                     
                     {# Badge 1 — Estado del modelo #}
                     {% if property.status == 'available' %}
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">
+                        <span class="px-2 py-0.5 rounded-full text-[12px] font-medium bg-success-bg text-success-text">
                             Disponible
                         </span>
                     {% elif property.status == 'rented' %}
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-warning-bg text-warning-text">
+                        <span class="px-2 py-0.5 rounded-full text-[12px] font-medium bg-warning-bg text-warning-text">
                             Alquilada
                         </span>
                     {% elif property.status == 'sold' %}
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">
+                        <span class="px-2 py-0.5 rounded-full text-[12px] font-medium bg-venta-bg text-venta-text">
                             Vendida
                         </span>
                     {% elif property.status == 'unavailable' %}
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">
+                        <span class="px-2 py-0.5 rounded-full text-[12px] font-medium bg-surface-container text-on-surface-variant">
                             No disponible
                         </span>
                     {% endif %}
@@ -81,10 +81,10 @@
                     {# Badge 2 — Contextual (computado por selector.py) #}
                     {% if ctx.contextual_badge %}
                         {% with badge=ctx.contextual_badge %}
-                            <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
-                            {% if badge.style == 'success' %}bg-success-bg text-success-text
-                            {% elif badge.style == 'warning' %}bg-warning-bg text-warning-text
-                            {% elif badge.style == 'danger' %}bg-danger-bg text-danger-text
+                            <span class="px-2 py-0.5 rounded-full text-[12px] font-small
+                            {% if badge.style == 'success' %}border border-success-text text-success-text
+                            {% elif badge.style == 'warning' %}border border-warning-text text-warning-text
+                            {% elif badge.style == 'danger' %}border border-danger-text text-danger-text
                             {% else %}bg-surface-container text-on-surface-variant
                             {% endif %}">
                                 {{ badge.text }}

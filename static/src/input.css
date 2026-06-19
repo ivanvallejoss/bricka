@@ -33,13 +33,13 @@
 
   /* ── Superficies ────────────────────────────────── */
   --color-background:                #f5f2ed;  /* warm beige — FRD */
-  --color-surface:                   #ffffff;
+  --color-surface:                   #fdfcfb;
   --color-surface-dim:               #dbd9dc;
-  --color-surface-container-lowest:  #ffffff;
-  --color-surface-container-low:     #f5f3f6;
-  --color-surface-container:         #efedf0;
-  --color-surface-container-high:    #e9e7ea;
-  --color-surface-container-highest: #e4e2e5;
+  --color-surface-container-lowest:  #fdfcfb;
+  --color-surface-container-low:     #f5f2ee;
+  --color-surface-container:         #ece9e3;
+  --color-surface-container-high:    #e6e2db;
+  --color-surface-container-highest: #e0dbd3;
 
 
   /* ── On-surface ─────────────────────────────────── */
