@@ -11,16 +11,25 @@ No todos los modelos tienen audit. La distinción es funcional:
 
 **Modelos auditados — heredan `SoftDeleteModel` + `AuditableMixin`:**
 
-- `Property`
-- `Listing`
 - `Contact`
 - `Deal`
+- `Document`
+- `Listing`
+- `Property`
 - `RentalContract`
 
 **Modelo auditable sin soft delete — hereda `BaseModel` + `AuditableMixin`:**
 
 - `BillingDocument` — inmutable una vez emitido, pero sus emisiones
-  y cancelaciones se registran
+  y cancelaciones se registran.
+
+  ⚠️ Nota de implementación: la versión inicial del modelo heredaba
+  `TimestampModel` (sin `updated_by`), lo que hacía que las futuras
+  cancelaciones quedaran atribuidas al emisor original en lugar de a
+  quien cancela. Corregido a `BaseModel` en la auditoría de coherencia
+  para que `updated_by` esté disponible cuando se implemente el service
+  de cancelación. Las filas previas a la migración `0008` tienen
+  `updated_by=NULL` — correcto por convención (acción del sistema).
 
 **Modelos de infraestructura — sin `AuditableMixin`:**
 
@@ -69,9 +78,10 @@ incluso cuando `SoftDeleteModel` ya incluye el enforcement de managers.**
 **Patrón canónico:**
 
 ```python
-class Property(SoftDeleteModel, AuditableMixin): ...    # soft delete + audit
-class BillingDocument(BaseModel, AuditableMixin): ...   # sin soft delete + audit
-class OutboundEvent(TimestampModel): ...                # sin restricción
+class Property(SoftDeleteModel, AuditableMixin): ...     # soft delete + audit
+class Document(SoftDeleteModel, AuditableMixin): ...     # soft delete + audit
+class BillingDocument(BaseModel, AuditableMixin): ...    # sin soft delete + audit
+class OutboundEvent(TimestampModel): ...                 # sin restricción
 ```
 
 ---
@@ -109,6 +119,15 @@ Property._default_manager.bulk_create(properties)
 `_default_manager` en un service es una señal de alerta inmediata.
 Su uso está permitido **únicamente** en management commands de
 migración con justificación explícita en el código.
+
+**Management commands de desarrollo (seed_demo_data):**
+
+`seed_demo_data --reset` usa `QuerySet._raw_delete()` para eliminar
+datos demo. Otra excepción documentada y acotada: bypasea tanto
+`AuditViolationError` como los signals de Django. Justificación:
+es un comando de desarrollo, no un flujo de negocio; eliminar filas
+demo no tiene valor auditivo. Ver `apps/common/management/commands/
+seed_demo_data.py` para el patrón y el razonamiento.
 
 ---
 
@@ -227,3 +246,30 @@ indexes = [
 Las consultas más frecuentes son "dame el historial de esta entidad"
 y "dame todas las acciones de este usuario". Los índices están
 optimizados para esos dos patrones.
+
+---
+
+## AppConfig.ready() — registro de signals
+
+**Decisión:** Cada app que tenga `signals.py` debe importarlo
+explícitamente en `AppConfig.ready()`.
+
+**Motivo:** Django no importa `signals.py` automáticamente. Sin este
+import, los `@receiver` nunca se registran y los signals no disparan
+— sin error, sin advertencia.
+
+**Patrón obligatorio para cualquier app con signals:**
+
+```python
+# apps/<app>/apps.py
+from django.apps import AppConfig
+
+class <App>Config(AppConfig):
+    name = "apps.<app>"
+
+    def ready(self):
+        import apps.<app>.signals  # noqa: F401
+```
+
+**Apps que actualmente requieren esto:** `audit`.
+Actualizar esta lista cuando otras apps agreguen signals.

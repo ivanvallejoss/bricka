@@ -23,4 +23,19 @@
 
 **Decisión documentada:** signals solo disparan si `AppConfig.ready()` importa `signals.py`. Sin ese import, los `@receiver` nunca se registran — sin error, sin advertencia.
 
-**Cobertura pendiente:** tests de signals para `BillingDocument` (`BaseModel + AuditableMixin` sin soft delete) — cuando se implemente esa vertical.
+**Cobertura pendiente:** tests de signals para `BillingDocument`
+(`BaseModel + AuditableMixin`, sin soft delete). La vertical está
+implementada (`billing/` completo con 38 tests pasando), pero los
+tests de signals de audit sobre `BillingDocument` no se escribieron
+todavía. Casos a cubrir cuando se agreguen:
+
+- CREATE → log con `before=null` y `after` con el snapshot del comprobante
+- "cancelación" (UPDATE de `status` de `issued` a `cancelled`) → log
+  con `action=UPDATE`, `before.status='issued'`, `after.status='cancelled'`,
+  y `actor_id` del cancelador
+
+  Nota: el service de cancelación no existe aún. Cuando se implemente,
+  debe setear `document.updated_by = actor` antes del save para que el
+  signal lo capture correctamente — `BillingDocument` tiene `updated_by`
+  desde la migración `0008`.
+  

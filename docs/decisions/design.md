@@ -667,3 +667,85 @@ en DB pasó de `property_id_id` a `property_id`.
 **Justificación:** un documento legal puede pertenecer a múltiples entidades
 (escritura asociada a propiedad + propietario). Forzar un único padre
 obliga a duplicar archivos o perder contexto operativo.
+
+## Imports cross-app de type hints — `TYPE_CHECKING`
+
+**Decisión:** Cuando un service o selector necesita el tipo de un modelo
+de otra app *solo para anotaciones* (sin queries en runtime), el import
+vive dentro del bloque `TYPE_CHECKING`.
+
+**Patrón:**
+
+```python
+from __future__ import annotations  # obligatorio — ver abajo
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from apps.contracts.models import RentalContract
+    from apps.contacts.models import Contact
+    from apps.deals.models import Deal
+
+def create_billing_document(
+    *,
+    contract: RentalContract | None = None,
+    recipient_contact: Contact | None = None,
+    deal: Deal | None = None,
+    ...
+) -> BillingDocument:
+```
+
+**`from __future__ import annotations` es obligatorio** en cualquier
+módulo que use este patrón. Sin él, Python evalúa las anotaciones en
+runtime y `"RentalContract" | None` lanza `TypeError` porque `str | NoneType`
+no es una operación válida. Con la importación futura activada, todas las
+anotaciones del módulo se vuelven strings lazy y nunca se evalúan en runtime.
+
+**Motivo de la regla:** importar `models.py` de otra app en runtime viola
+la convención "cross-app solo via selectors/services/choices". Aunque
+un import de type hint no genera queries, establece una dependencia
+de importación entre módulos que puede crear imports circulares y acopla
+la estructura interna de apps. `TYPE_CHECKING` resuelve el dilema:
+el type checker ve el tipo, el runtime no ejecuta el import.
+
+**`User` — caso especial:** `User` se importa via `get_user_model()` en
+runtime (no bajo `TYPE_CHECKING`) porque Django lo requiere para resolver
+`AUTH_USER_MODEL`. No va bajo `TYPE_CHECKING`.
+
+```python
+from django.contrib.auth import get_user_model
+User = get_user_model()
+```
+
+**Aplica actualmente en:** `billing/services.py` y `billing/selectors.py`.
+Cualquier vertical nueva que necesite tipos de otra app sin queries reales
+debe seguir este patrón.
+
+---
+
+## `categorize_document` — fuente de verdad en `documents/utils.py`
+
+**Decisión:** La función `categorize_document(content_type: str) -> str`
+vive en `apps/documents/utils.py`. Es la única fuente autorizada.
+
+**Contexto:** durante el desarrollo inicial existía una copia en
+`apps/common/storage.py`. Esa copia fue eliminada en la auditoría de
+coherencia — `common/storage.py` se ocupa de acceso a R2 y generación
+de URLs, no de lógica de presentación de documentos.
+
+**Callers:** `apps/properties/views.py` importa desde `documents/utils`.
+Cualquier nueva view o template tag que necesite categorizar archivos
+debe importar desde la misma fuente.
+
+```python
+# correcto
+from apps.documents.utils import categorize_document
+
+# incorrecto — la función ya no existe ahí
+from apps.common.storage import categorize_document
+```
+
+Nota: este import cross-app (`properties` importando de `documents/utils`)
+es una función pura sin queries — no rompe la regla de "cross-app via
+selectors" en su intención. Aun así, si en el futuro la view de properties
+acumula más imports de `documents`, conviene evaluar si la lógica de
+presentación debería consolidarse en un selector o context dedicado.
