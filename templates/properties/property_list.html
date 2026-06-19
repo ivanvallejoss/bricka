@@ -61,7 +61,7 @@
                     }[this.tab] || [];
                 }
             }"
-            hx-get="#"
+            hx-get="{% url 'properties:list' %}"
             hx-target="#property-table-body"
             hx-swap="innerHTML"
             hx-push-url="true">
