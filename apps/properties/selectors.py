@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Prefetch, QuerySet, Q
 
 from apps.properties.models import Property, PropertyMedia
 
@@ -15,6 +15,7 @@ class PropertyFilters:
     operation_type: str | None = None
     property_type: str | None = None
     is_external: bool | None = None
+    search: str | None = None
 
 
 def get_property_list(
@@ -49,6 +50,14 @@ def get_property_list(
 
     if filters.is_external is not None:
         qs = qs.filter(is_external=filters.is_external)
+
+    if filters.search:
+        qs = qs.filter(
+            Q(title__icontains=filters.search) |
+            Q(address_line__icontains=filters.search) |
+            Q(neighborhood__icontains=filters.search) |
+            Q(city__icontains=filters.search)
+        )
 
     return qs
 

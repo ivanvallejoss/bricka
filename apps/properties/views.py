@@ -4,6 +4,9 @@ from datetime import date
 
 from django.shortcuts import render
 from django.http import Http404
+from django.core.paginator import Paginator
+
+from urllib.parse import urlencode
 
 from .models import Property
 from .selectors import PropertyFilters, get_property_list, get_property_preview, get_property_detail
@@ -36,16 +39,21 @@ _BADGE_MAP = {
 
 def property_list(request):
     tab = request.GET.get("tab", "all")
-    op_type = {"rent": "rent", "sale": "sale"}.get(tab)  # None si tab == "all"
+    op_type = {"rent": "rent", "sale": "sale"}.get(tab)
+    search = request.GET.get("q", "").strip() or None
+    status_param = request.GET.get("status")
 
     filters = PropertyFilters(
-        status=[request.GET.get("status")] if request.GET.get("status") not in (None, "all") else None,
+        status=[status_param] if status_param not in (None, "all") else None,
         operation_type=op_type,
+        search=search,
     )
 
-    properties = list(get_property_list(filters))
+    qs = get_property_list(filters)
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
 
-    all_contracts = [c for prop in properties for c in prop.active_contracts_list]
+    all_contracts = [c for prop in page_obj.object_list for c in prop.active_contracts_list]
     payment_statuses = get_rental_payment_status(all_contracts, as_of=date.today())
 
     prop_badges = {
@@ -65,18 +73,30 @@ def property_list(request):
             ),
             contextual_badge=prop_badges.get(prop.id),
         )
-        for prop in properties
+        for prop in page_obj.object_list
     ]
+
+    if page_obj.has_next():
+        params = {
+            "tab": tab,
+            "status": request.GET.get("status", "all"),
+            "q": request.GET.get("q", ""),
+            "page": page_obj.next_page_number(),
+        }
+        next_page_url = f"{request.path}?{urlencode(params)}"
+    else:
+        next_page_url = None
 
     return render(request, "properties/property_list.html", {
         "properties": property_contexts,
-        "total_count": len(properties),
+        "total_count": paginator.count,
         "current_tab": tab,
         "current_status": request.GET.get("status", "all"),
         "search_query": request.GET.get("q", ""),
-        "page_obj": None,      # placeholder — se activa con paginación
-        "next_page_url": None,
+        "page_obj": page_obj,
+        "next_page_url": next_page_url,
     })
+
 
 def property_slide_over(request, pk):
     try:
