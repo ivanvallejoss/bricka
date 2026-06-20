@@ -4,111 +4,201 @@ Todo carga inmediata. property y listings ya vienen resueltos desde property_det
 {% endcomment %}
 <div class="space-y-4">
 
-    {# Estado + precio(s) #}
-    <div class="bg-surface border border-outline rounded-md p-4">
-        <div class="flex items-center gap-1.5 flex-wrap mb-3">
-            {% if property.status == 'available' %}
-                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">Disponible</span>
-            {% elif property.status == 'rented' %}
-                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-warning-bg text-warning-text">Alquilada</span>
-            {% elif property.status == 'sold' %}
-                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">Vendida</span>
-            {% elif property.status == 'unavailable' %}
-                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">No disponible</span>
-            {% endif %}
-            {% if property.has_rent_listing %}
-                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-alquiler-bg text-alquiler-text">Alquiler</span>
-            {% endif %}
-            {% if property.has_sale_listing %}
-                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-venta-bg text-venta-text">Venta</span>
-            {% endif %}
-        </div>
+    {# Estado + Características + Billing #}
+    <div class="bg-surface border border-outline rounded-md overflow-hidden">
 
-        {% for listing in listings %}
-            <div class="flex items-center justify-between py-1.5 {% if not forloop.last %}border-b border-outline{% endif %}">
-                <span class="text-xs text-on-surface-variant">
-                    {% if listing.operation_type == 'sale' %}Venta
-                    {% elif listing.operation_type == 'rent' %}Alquiler
-                    {% elif listing.operation_type == 'temporary_rent' %}Alq. temporario
+        {# Header coloreado #}
+        <div class="px-4 py-3
+                    {% if property.status == 'available' %}bg-success-bg
+                    {% elif property.status == 'rented' %}bg-alquiler-bg
+                    {% elif property.status == 'sold' %}bg-venta-bg
+                    {% else %}bg-surface-container{% endif %}">
+
+            <p class="text-sm font-semibold
+                    {% if property.status == 'available' %}text-success-text
+                    {% elif property.status == 'rented' %}text-alquiler-text
+                    {% elif property.status == 'sold' %}text-venta-text
+                    {% else %}text-on-surface-variant{% endif %}">
+                {% if property.status == 'available' %}
+                    Disponible{% if property.has_rent_listing and property.has_sale_listing %} — Alquiler y Venta{% elif property.has_rent_listing %} — Alquiler{% elif property.has_sale_listing %} — Venta{% endif %}
+                {% elif property.status == 'rented' %}Alquilada
+                {% elif property.status == 'sold' %}Vendida
+                {% else %}No disponible{% endif %}
+            </p>
+
+            {% if property.status == 'rented' and active_contract %}
+            <p class="text-[13px] font-medium tabular-nums mt-0.5 text-alquiler-text">
+                ${{ active_contract.current_price|floatformat:0 }}
+                <span class="text-xs font-normal">/ mes</span>
+            </p>
+            {% else %}
+            {% for listing in listings %}
+            <p class="text-[13px] font-medium tabular-nums mt-0.5
+                    {% if property.status == 'available' %}text-success-text
+                    {% elif property.status == 'sold' %}text-venta-text
+                    {% else %}text-on-surface-variant{% endif %}">
+                ${{ listing.price|floatformat:0 }}
+                <span class="text-xs font-normal">
+                    {% if listing.operation_type == 'rent' %}/ mes
+                    {% elif listing.operation_type == 'temporary_rent' %}/ día
                     {% endif %}
                 </span>
-                <span class="text-sm font-medium text-on-surface tabular-nums">${{ listing.price|floatformat:0 }}</span>
-            </div>
-        {% empty %}
-            <p class="text-sm text-on-surface-variant">Sin listings activos.</p>
-        {% endfor %}
-    </div>
-
-    {# Características #}
-    <div class="bg-surface border border-outline rounded-md p-4">
-        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
-            Características
-        </p>
-        <div class="grid grid-cols-2 gap-y-2.5 gap-x-3">
-            {% if property.property_type %}
-            <div>
-                <p class="text-[11px] text-on-surface-variant">Tipo</p>
-                <p class="text-sm font-medium text-on-surface">{{ property.get_property_type_display }}</p>
-            </div>
-            {% endif %}
-            {% if property.area_m2 %}
-            <div>
-                <p class="text-[11px] text-on-surface-variant">Superficie</p>
-                <p class="text-sm font-medium text-on-surface">{{ property.area_m2|floatformat:0 }} m²</p>
-            </div>
-            {% endif %}
-            {% if property.bedrooms is not None %}
-            <div>
-                <p class="text-[11px] text-on-surface-variant">Dormitorios</p>
-                <p class="text-sm font-medium text-on-surface">{{ property.bedrooms }}</p>
-            </div>
-            {% endif %}
-            {% if property.bathrooms is not None %}
-            <div>
-                <p class="text-[11px] text-on-surface-variant">Baños</p>
-                <p class="text-sm font-medium text-on-surface">{{ property.bathrooms }}</p>
-            </div>
-            {% endif %}
-            {% if property.year_built %}
-            <div>
-                <p class="text-[11px] text-on-surface-variant">Año</p>
-                <p class="text-sm font-medium text-on-surface">{{ property.year_built }}</p>
-            </div>
-            {% endif %}
-            {% if property.neighborhood %}
-            <div>
-                <p class="text-[11px] text-on-surface-variant">Barrio</p>
-                <p class="text-sm font-medium text-on-surface">{{ property.neighborhood }}</p>
-            </div>
+            </p>
+            {% endfor %}
             {% endif %}
         </div>
 
-        {% if property.features %}
-        <div class="mt-3 flex flex-wrap gap-1.5">
-            {% for feature in property.features %}
+        {# Características #}
+        <div class="p-4">
+            <div class="grid grid-cols-2 gap-y-2.5 gap-x-3">
+                {% if property.property_type %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant">Tipo</p>
+                    <p class="text-sm font-medium text-on-surface">{{ property.get_property_type_display }}</p>
+                </div>
+                {% endif %}
+                {% if property.area_m2 %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant">Superficie</p>
+                    <p class="text-sm font-medium text-on-surface">{{ property.area_m2|floatformat:0 }} m²</p>
+                </div>
+                {% endif %}
+                {% if property.bedrooms is not None %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant">Dormitorios</p>
+                    <p class="text-sm font-medium text-on-surface">{{ property.bedrooms }}</p>
+                </div>
+                {% endif %}
+                {% if property.bathrooms is not None %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant">Baños</p>
+                    <p class="text-sm font-medium text-on-surface">{{ property.bathrooms }}</p>
+                </div>
+                {% endif %}
+                {% if property.year_built %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant">Año</p>
+                    <p class="text-sm font-medium text-on-surface">{{ property.year_built }}</p>
+                </div>
+                {% endif %}
+                {% if property.neighborhood %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant">Barrio</p>
+                    <p class="text-sm font-medium text-on-surface">{{ property.neighborhood }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if property.features %}
+            <div class="mt-3 flex flex-wrap gap-1.5">
+                {% for feature in property.features %}
                 <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant border border-outline">
                     {{ feature }}
                 </span>
-            {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {# Billing — solo si alquilada #}
+        {% if property.status == 'rented' and active_contract %}
+        <div class="px-4 py-3 border-t border-outline
+            {% if payment_status == 'paid' %}bg-success-bg
+            {% elif payment_status == 'overdue' %}bg-danger-bg
+            {% else %}bg-warning-bg{% endif %}">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-[11px] font-medium uppercase tracking-wide
+                            {% if payment_status == 'paid' %}text-success-text
+                            {% elif payment_status == 'overdue' %}text-danger-text
+                            {% else %}text-warning-text{% endif %}">
+                        {% if payment_status == 'paid' %}Pago
+                        {% elif payment_status == 'overdue' %}En mora
+                        {% else %}Pendiente{% endif %}
+                    </p>
+                    <p class="text-[13px] font-semibold text-on-surface tabular-nums mt-0.5">
+                        ${{ active_contract.current_price|floatformat:0 }}
+                        <span class="text-xs font-normal text-on-surface-variant">/ mes</span>
+                    </p>
+                </div>
+                <p class="text-xs text-on-surface-variant shrink-0">
+                    Vence el {{ active_contract.payment_due_day }}
+                </p>
+            </div>
         </div>
         {% endif %}
+
     </div>
 
-    {# Propietario #}
+    {# Resumen: Documentos + Facturas #}
     <div class="bg-surface border border-outline rounded-md p-4">
         <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
-            Propietario
+            Resumen
         </p>
-        {% if property.owner_contact %}
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[12px] text-on-surface-variant">Archivos</p>
+                {% if document_count %}
+                <a href="#documentos" class="text-[12px] font-medium text-primary-container hover:underline">
+                    {{ document_count }} →
+                </a>
+                {% else %}
+                <p class="text-[12px] text-on-surface-variant">—</p>
+                {% endif %}
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[12px] text-on-surface-variant">Comprobantes</p>
+                {% if invoice_count %}
+                <a href="#facturacion" class="text-[12px] font-medium text-primary-container hover:underline">
+                    {{ invoice_count }} →
+                </a>
+                {% else %}
+                <p class="text-[12px] text-on-surface-variant">—</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Propietario e Inquilino #}
+    <div class="bg-surface border border-outline rounded-md p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Contactos
+        </p>
+        <div class="flex flex-col gap-4">
+
+            {% if property.owner_contact %}
+            <div class="flex items-start gap-3 space-y-2">
+                <div class="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0 mt-0.5">
                     {% include "icons/users.html" with size="15" class="text-primary-container" %}
                 </div>
-                <p class="text-sm font-medium text-on-surface truncate">{{ property.owner_contact.full_name }}</p>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-on-surface truncate">{{ property.owner_contact.full_name }}</p>
+                    <p class="text-[11px] text-on-surface-variant mb-1.5">Propietario</p>
+                    <p class="text-[12px] text-on-surface-variant">{{ property.owner_contact.email|default:"—" }}</p>
+                    <p class="text-[12px] text-on-surface-variant">{{ property.owner_contact.phone|default:"—" }}</p>
+                </div>
             </div>
-        {% else %}
-            <p class="text-sm text-on-surface-variant">Sin propietario asignado.</p>
-        {% endif %}
+            {% endif %}
+
+            {% if active_contract %}
+            <div class="flex items-start gap-3 pt-3 border-t border-outline"  space-y-2>
+                <div class="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0 mt-0.5">
+                    {% include "icons/users.html" with size="15" class="text-primary-container" %}
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-on-surface truncate">{{ active_contract.tenant_contact.full_name }}</p>
+                    <p class="text-[11px] text-on-surface-variant mb-1.5">Inquilino</p>
+                    <p class="text-[12px] text-on-surface-variant">{{ active_contract.tenant_contact.email|default:"—" }}</p>
+                    <p class="text-[12px] text-on-surface-variant">{{ active_contract.tenant_contact.phone|default:"—" }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not property.owner_contact and not active_contract %}
+                <p class="text-sm text-on-surface-variant">Sin contactos asignados.</p>
+            {% endif %}
+
+        </div>
     </div>
 
     {# Acciones #}

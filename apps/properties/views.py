@@ -7,9 +7,13 @@ from django.http import Http404
 
 from .models import Property
 from .selectors import PropertyFilters, get_property_list, get_property_preview, get_property_detail
-from .contexts import PropertyListContext
+from .contexts import BadgeContext, PropertyListContext
 
-from apps.billing.selectors import get_rental_payment_status, get_recent_documents_for_contract
+from apps.billing.selectors import (
+    get_rental_payment_status, 
+    get_recent_documents_for_contract,
+    get_billing_document_count_for_contract,
+    )
 from apps.billing.choices import PaymentStatus
 
 from apps.common.storage import build_media_url, generate_document_url
@@ -22,7 +26,12 @@ from apps.documents.utils import categorize_document
 
 from apps.listings.selectors import get_listings_for_property
 
-from apps.properties.contexts import BadgeContext
+
+_BADGE_MAP = {
+    PaymentStatus.PAID:    BadgeContext(text="Pago",      style="success"),
+    PaymentStatus.PENDING: BadgeContext(text="Pendiente", style="warning"),
+    PaymentStatus.OVERDUE: BadgeContext(text="En mora",   style="danger"),
+}
 
 
 def property_list(request):
@@ -39,11 +48,6 @@ def property_list(request):
     all_contracts = [c for prop in properties for c in prop.active_contracts_list]
     payment_statuses = get_rental_payment_status(all_contracts, as_of=date.today())
 
-    _BADGE_MAP = {
-        PaymentStatus.PAID:    BadgeContext(text="Pago",      style="success"),
-        PaymentStatus.PENDING: BadgeContext(text="Pendiente", style="warning"),
-        PaymentStatus.OVERDUE: BadgeContext(text="En mora",   style="danger"),
-    }
     prop_badges = {
         c.property_id: _BADGE_MAP[payment_statuses[c.id]]
         for c in all_contracts
@@ -131,8 +135,12 @@ def slide_over_contacts(request, pk):
         prop = get_property_detail(pk)
     except Property.DoesNotExist:
         raise Http404
+
+    active_contract = get_active_contract_for_property(pk)
+    
     return render(request, "properties/partials/_slide_over_contacts.html", {
         "property": prop,
+        "active_contract": active_contract,
     })
 
 
@@ -159,6 +167,19 @@ def property_detail(request, pk):
     except Property.DoesNotExist:
         raise Http404
 
+    active_contract = get_active_contract_for_property(pk)
+    payment_status = None
+    invoice_count = 0
+    recent_documents = []
+
+    if active_contract:
+        statuses = get_rental_payment_status([active_contract], as_of=date.today())
+        payment_status = statuses.get(active_contract.id)
+        invoice_count = get_billing_document_count_for_contract(active_contract.id)
+        recent_documents = list(get_recent_documents_for_contract(active_contract.id, limit=6))
+    
+    document_count = get_document_list(DocumentFilters(property_id=pk)).count()
+
     media_list = list(prop.media.all())  # ya viene prefetched ordenado
     cover_url = None
     if media_list:
@@ -170,6 +191,11 @@ def property_detail(request, pk):
 
     return render(request, "properties/property_detail.html", {
         "property": prop,
+        "active_contract": active_contract,
+        "payment_status": payment_status,
+        "invoice_count": invoice_count,
+        "document_count": document_count,
+        "recent_documents": recent_documents,
         "cover_url": cover_url,
         "gallery_urls": gallery_urls,
         "gallery_urls_json": json.dumps(gallery_urls),

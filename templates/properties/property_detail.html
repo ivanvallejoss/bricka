@@ -72,7 +72,7 @@
 
             {# Publicaciones — lazy #}
             <div hx-get="{% url 'properties:detail_publications' property.pk %}"
-                 hx-trigger="revealed"
+                 hx-trigger="load"
                  hx-swap="outerHTML"
                  class="bg-surface border border-outline rounded-md p-5">
                 {% include "properties/partials/_slide_over_loading.html" with label="publicaciones" %}
@@ -80,21 +80,67 @@
 
             {# Documentos — lazy #}
             <div hx-get="{% url 'properties:detail_documents' property.pk %}"
-                 hx-trigger="revealed"
+                 hx-trigger="load"
                  hx-swap="outerHTML"
-                 class="bg-surface border border-outline rounded-md p-5">
+                 class="bg-surface border border-outline rounded-md p-5"
+                 id="documentos">
                 {% include "properties/partials/_slide_over_loading.html" with label="documentos" %}
             </div>
 
-            {# Facturación — placeholder hasta tener selectors de contratos #}
-            <section class="bg-surface border border-outline rounded-md p-5">
-                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
-                    Facturación
-                </p>
-                <p class="text-sm text-on-surface-variant">
-                    Disponible cuando se implemente la sección de contratos.
-                </p>
+            {# Facturación #}
+            {% if active_contract %}
+            <section id="facturacion" class="bg-surface border border-outline rounded-md overflow-hidden">
+                <div class="px-5 py-4 border-b border-outline">
+                    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Facturación
+                    </p>
+                </div>
+
+                {% if recent_documents %}
+                <div class="divide-y divide-outline">
+                    {% for doc in recent_documents %}
+                    <div class="flex items-center justify-between gap-3 px-5 py-3
+                                {% if doc.status == 'cancelled' %}opacity-50{% endif %}">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <p class="text-[13px] font-medium text-on-surface">
+                                    {{ doc.get_document_type_display }}
+                                </p>
+                                {% if doc.status == 'cancelled' %}
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-danger-bg text-danger-text">
+                                    Cancelado
+                                </span>
+                                {% endif %}
+                            </div>
+                            <p class="text-[12px] text-on-surface-variant tabular-nums mt-0.5">
+                                #{{ doc.number }}
+                                {% if doc.period %} · {{ doc.period|date:"m/Y" }}{% endif %}
+                                · {{ doc.date|date:"d/m/Y" }}
+                            </p>
+                        </div>
+                        <p class="text-[15px] font-semibold text-on-surface tabular-nums shrink-0">
+                            ${{ doc.total_amount|floatformat:0 }}
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if invoice_count > 6 %}
+                <div class="px-5 py-3 border-t border-outline">
+                    <p class="text-[12px] text-on-surface-variant">
+                        Mostrando 6 de {{ invoice_count }} comprobantes.
+                    </p>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <div class="px-5 py-4">
+                    <p class="text-sm text-on-surface-variant">Sin comprobantes emitidos.</p>
+                </div>
+                {% endif %}
+
             </section>
+            {% endif %}
 
         </div>
 
