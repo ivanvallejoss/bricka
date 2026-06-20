@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
 
+from django.db.models import QuerySet
+
 from apps.contracts.choices import ContractStatus
 
 from .choices import DocumentStatus, DocumentType, PaymentStatus
@@ -84,3 +86,11 @@ def get_rental_payment_status(
             result[contract.id] = PaymentStatus.PENDING
 
     return result
+
+
+def get_recent_documents_for_contract(contract_id: UUID, limit: int = 4) -> QuerySet:
+    return (
+        BillingDocument.objects
+        .filter(contract_id=contract_id)
+        .order_by("-date", "-number")[:limit]
+    )

@@ -2,7 +2,94 @@
     <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
         Cobro
     </p>
-    <p class="text-sm text-on-surface-variant">
-        Disponible cuando se implemente la sección de contratos.
-    </p>
+
+    {% if contract %}
+
+        {# ── Estado del mes ──────────────────────────────── #}
+        <div class="flex items-center justify-between gap-3 p-3 rounded-md border mb-3
+                    {% if payment_status == 'paid' %}bg-success-bg border-success-text/20
+                    {% elif payment_status == 'overdue' %}bg-danger-bg border-danger-text/20
+                    {% else %}bg-warning-bg border-warning-text/20{% endif %}">
+            <div>
+                <p class="text-[11px] font-medium uppercase tracking-wide
+                          {% if payment_status == 'paid' %}text-success-text
+                          {% elif payment_status == 'overdue' %}text-danger-text
+                          {% else %}text-warning-text{% endif %}">
+                    {% if payment_status == 'paid' %}Pago
+                    {% elif payment_status == 'overdue' %}En mora
+                    {% else %}Pendiente{% endif %}
+                </p>
+                <p class="text-[13px] font-semibold text-on-surface tabular-nums mt-0.5">
+                    ${{ contract.current_price|floatformat:0 }}
+                    <span class="text-xs font-normal text-on-surface-variant">/ mes</span>
+                </p>
+            </div>
+            <p class="text-xs text-on-surface-variant shrink-0">
+                Vence el {{ contract.payment_due_day }}
+            </p>
+        </div>
+
+        {# ── Datos del contrato ───────────────────────────── #}
+        <div class="space-y-2 mb-3">
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant shrink-0">Inquilino</p>
+                <p class="text-[13px] font-medium text-on-surface truncate">
+                    {{ contract.tenant_contact.full_name }}
+                </p>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant shrink-0">Vigencia</p>
+                <p class="text-[13px] font-medium text-on-surface tabular-nums">
+                    {{ contract.start_date|date:"m/Y" }} → {{ contract.end_date|date:"m/Y" }}
+                </p>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant shrink-0">Índice</p>
+                <p class="text-[13px] font-medium text-on-surface">
+                    {{ contract.get_adjustment_index_display }}
+                </p>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant shrink-0">Próx. ajuste</p>
+                <p class="text-[13px] font-medium text-on-surface tabular-nums">
+                    {{ contract.next_adjustment_date|date:"d/m/Y" }}
+                </p>
+            </div>
+        </div>
+
+        {# ── Últimos comprobantes ─────────────────────────── #}
+        {% if recent_documents %}
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-2">
+            Últimos comprobantes
+        </p>
+        <div class="space-y-1.5">
+            {% for doc in recent_documents %}
+            <div class="flex items-center justify-between gap-2 py-2 px-2.5 rounded-md
+                        bg-surface-container-low border border-outline
+                        {% if doc.status == 'cancelled' %}opacity-50{% endif %}">
+                <div class="min-w-0">
+                    <p class="text-[12px] font-medium text-on-surface truncate">
+                        {{ doc.get_document_type_display }}
+                        {% if doc.status == 'cancelled' %}
+                            <span class="text-danger-text text-[11px]">(Cancelado)</span>
+                        {% endif %}
+                    </p>
+                    <p class="text-[11px] text-on-surface-variant tabular-nums">
+                        #{{ doc.number }} · {{ doc.date|date:"d/m/Y" }}
+                    </p>
+                </div>
+                <p class="text-[13px] font-semibold text-on-surface tabular-nums shrink-0">
+                    ${{ doc.total_amount|floatformat:0 }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+            <p class="text-sm text-on-surface-variant">Sin comprobantes emitidos.</p>
+        {% endif %}
+
+    {% else %}
+        <p class="text-sm text-on-surface-variant">Sin contrato activo.</p>
+    {% endif %}
+
 </div>

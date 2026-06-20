@@ -9,17 +9,21 @@ from .models import Property
 from .selectors import PropertyFilters, get_property_list, get_property_preview, get_property_detail
 from .contexts import PropertyListContext
 
-from apps.listings.selectors import get_listings_for_property
+from apps.billing.selectors import get_rental_payment_status, get_recent_documents_for_contract
+from apps.billing.choices import PaymentStatus
+
+from apps.common.storage import build_media_url, generate_document_url
+
+from apps.contracts.selectors import get_active_contract_for_property
 
 from apps.documents.selectors import get_document_list, DocumentFilters
 from apps.documents.context import DocumentContext
 from apps.documents.utils import categorize_document
 
-from apps.billing.selectors import get_rental_payment_status
-from apps.billing.choices import PaymentStatus
+from apps.listings.selectors import get_listings_for_property
+
 from apps.properties.contexts import BadgeContext
 
-from apps.common.storage import build_media_url, generate_document_url
 
 def property_list(request):
     tab = request.GET.get("tab", "all")
@@ -104,8 +108,21 @@ def slide_over_billing(request, pk):
         prop = get_property_preview(pk)
     except Property.DoesNotExist:
         raise Http404
+
+    contract = get_active_contract_for_property(pk)
+    payment_status = None
+    recent_documents = []
+
+    if contract:
+        statuses = get_rental_payment_status([contract], as_of=date.today())
+        payment_status = statuses.get(contract.id)
+        recent_documents = list(get_recent_documents_for_contract(contract.id))
+
     return render(request, "properties/partials/_slide_over_billing.html", {
         "property": prop,
+        "contract": contract,
+        "payment_status": payment_status,
+        "recent_documents": recent_documents,
     })
 
 

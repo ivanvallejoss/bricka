@@ -79,7 +79,9 @@ def get_active_contract_for_property(property_id: UUID) -> RentalContract | None
     Punto de entrada cross-app — usado por properties/ para determinar
     el estado operacional de la propiedad.
     """
-    return RentalContract.objects.filter(
+    return RentalContract.objects.select_related(
+        "tenant_contact"
+    ).filter(
         property_id=property_id,
         status=ContractStatus.ACTIVE,
     ).first()
