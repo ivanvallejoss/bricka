@@ -2,7 +2,7 @@
 Sidebar de detalle — sticky en desktop, inline en mobile (ver property_detail.html).
 Todo carga inmediata. property y listings ya vienen resueltos desde property_detail view.
 {% endcomment %}
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-4">
 
     {# Estado + Características + Billing #}
     <div class="bg-surface border border-outline rounded-md overflow-hidden">
@@ -131,7 +131,7 @@ Todo carga inmediata. property y listings ya vienen resueltos desde property_det
     </div>
 
     {# Resumen: Documentos + Facturas #}
-    <div class="bg-surface border border-outline rounded-md p-4">
+    <div class="hidden lg:block bg-surface border border-outline rounded-md p-4">
         <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
             Resumen
         </p>
