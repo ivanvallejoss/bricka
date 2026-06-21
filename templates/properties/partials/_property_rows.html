@@ -8,13 +8,6 @@
     HTMX extrae el elemento oob antes de insertar las filas — el tbody
     recibe solo <tr>, que es HTML válido.
 {% endcomment %}
-
-{% if request.htmx %}
-    <span id="property-counter" hx-swap-oob="true">
-        {{ total_count }} propiedad{{ total_count|pluralize:"es" }}
-    </span>
-{% endif %}
-
 {% for ctx in properties %}
     {% with property=ctx.property %}
         <tr
@@ -199,4 +192,10 @@
         </div>
     </td>
 </tr>
+{% endif %}
+
+{% if request.htmx %}
+    <span id="property-counter" hx-swap-oob="true">
+        {{ total_count }} propiedad{{ total_count|pluralize:"es" }}
+    </span>
 {% endif %}

@@ -23,48 +23,49 @@
         {# x-data vive en el <form> — this.$el en métodos Alpine = el <form> mismo. $el.form en el handler del input = el <form> contenedor (HTMLInputElement.form). Ambos llaman requestSubmit() que dispara el evento submit que HTMX intercepta.#}
 
         {% with tab=current_tab|default:"all" status=current_status|default:"all" %}
-        <form
-            x-data="{
-                tab:    '{{ tab }}',
-                status: '{{ status }}',
+            <form
+                id="property-filters"
+                x-data="{
+                    tab:    '{{ tab }}',
+                    status: '{{ status }}',
 
-                setTab(t) {
-                    this.tab    = t;
-                    this.status = 'all';
-                    this.$nextTick(() => this.$el.requestSubmit());
-                },
+                    setTab(t) {
+                        this.tab    = t;
+                        this.status = 'all';
+                        this.$nextTick(() => htmx.trigger(document.getElementById('property-filters'), 'submit'));
+                    },
 
-                setStatus(s) {
-                    this.status = s;
-                    this.$nextTick(() => this.$el.requestSubmit());
-                },
+                    setStatus(s) {
+                        this.status = s;
+                        this.$nextTick(() => htmx.trigger(document.getElementById('property-filters'), 'submit'));
+                    },
 
-                get pills() {
-                    return {
-                        all:  [
-                            { v: 'all',         l: 'Todas'         },
-                            { v: 'AVAILABLE',   l: 'Disponibles'   },
-                            { v: 'RENTED',      l: 'Alquiladas'    },
-                            { v: 'SOLD',        l: 'Vendidas'      },
-                            { v: 'UNAVAILABLE', l: 'No disponibles'},
-                        ],
-                        rent: [
-                            { v: 'all',       l: 'Todas'        },
-                            { v: 'AVAILABLE', l: 'Disponibles'  },
-                            { v: 'RENTED',    l: 'Alquiladas'   },
-                        ],
-                        sale: [
-                            { v: 'all',       l: 'Todas'       },
-                            { v: 'AVAILABLE', l: 'Disponibles' },
-                            { v: 'SOLD',      l: 'Vendidas'    },
-                        ],
-                    }[this.tab] || [];
-                }
-            }"
-            hx-get="{% url 'properties:list' %}"
-            hx-target="#property-table-body"
-            hx-swap="innerHTML"
-            hx-push-url="true">
+                    get pills() {
+                        return {
+                            all:  [
+                                { v: 'all',         l: 'Todas'          },
+                                { v: 'available',   l: 'Disponibles'    },
+                                { v: 'rented',      l: 'Alquiladas'     },
+                                { v: 'sold',        l: 'Vendidas'       },
+                                { v: 'unavailable', l: 'No disponibles' },
+                            ],
+                            rent: [
+                                { v: 'all',       l: 'Todas'       },
+                                { v: 'available', l: 'Disponibles' },
+                                { v: 'rented',    l: 'Alquiladas'  },
+                            ],
+                            sale: [
+                                { v: 'all',       l: 'Todas'       },
+                                { v: 'available', l: 'Disponibles' },
+                                { v: 'sold',      l: 'Vendidas'    },
+                            ],
+                        }[this.tab] || [];
+                    }
+                }"
+                hx-get="{% url 'properties:list' %}"
+                hx-target="#property-table-body"
+                hx-swap="innerHTML"
+                hx-push-url="true">
 
             {# Estado serializado — HTMX los incluye en el GET al hacer submit #}
             <input type="hidden" name="tab"    :value="tab">
@@ -79,7 +80,7 @@
                     type="text"
                     name="q"
                     value="{{ search_query|default:'' }}"
-                    @input.debounce.400ms="$el.form.requestSubmit()"
+                    @input.debounce.400ms="htmx.trigger(document.getElementById('property-filters'), 'submit')"
                     placeholder="Buscar propiedad..."
                     autocomplete="off"
                     class="w-full pl-9 pr-4 py-2 text-sm bg-surface border border-outline rounded
