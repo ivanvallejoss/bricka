@@ -137,11 +137,11 @@
                 <table class="w-full table-fixed">
 
                     <colgroup>
-                        <col class="w-14">    {# thumbnail  #}
-                        <col>                  {# propiedad  #}
-                        <col class="w-100">    {# estado     #}
-                        <col class="w-28">    {# precio     #}
-                        <col class="w-24">    {# acciones   #}
+                        <col class="w-14">              {# thumbnail: full height #}
+                        <col>                            {# título + badges mobile #}
+                        <col class="w-0 md:w-100">      {# badges: oculto mobile → 400px desktop #}
+                        <col class="w-20 md:w-28">      {# precio: 80px mobile → 112px desktop #}
+                        <col class="w-0 md:w-24">       {# acciones: oculto mobile #}
                     </colgroup>
 
                     <thead>
@@ -151,15 +151,14 @@
                                        tracking-[0.07em] text-on-surface-variant">
                                 Propiedad
                             </th>
-                            <th class="py-3 px-3 pr-20 text-[11px] font-medium uppercase
-                                       tracking-[0.07em] text-on-surface-variant">
+                            <th class="hidden md:table-cell py-3 px-3 text-center text-[11px] font-medium uppercase
+                                    tracking-[0.07em] text-on-surface-variant">
                                 Estado
                             </th>
-                            <th class="py-3 px-3 pr-center text-[11px] font-medium uppercase
-                                       tracking-[0.07em] text-on-surface-variant">
+                            <th class="py-3 px-3 text-right md:text-center text-[11px] font-medium uppercase
+                                    tracking-[0.07em] text-on-surface-variant">
                                 Precio
                             </th>
-                            <th class="py-3 pr-4 hidden md:table-cell"></th>
                         </tr>
                     </thead>
 

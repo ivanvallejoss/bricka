@@ -71,7 +71,7 @@
             {% include "properties/partials/_detail_gallery.html" %}
 
             {# Publicaciones — lazy #}
-            <div hx-get="{% url 'properties:detail_publications' property.pk %}"
+            <div hx-get="{% url 'properties:detail_publication' property.pk %}"
                  hx-trigger="load"
                  hx-swap="outerHTML"
                  class="bg-surface border border-outline rounded-md p-5">

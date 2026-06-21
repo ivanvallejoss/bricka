@@ -223,11 +223,11 @@ def property_detail(request, pk):
     })
 
 
-def detail_publications(request, pk):
+def detail_publication(request, pk):
     if not Property.objects.filter(pk=pk).exists():
         raise Http404
     listings = list(get_listings_for_property(pk))
-    return render(request, "properties/partials/_detail_publications.html", {
+    return render(request, "properties/partials/_detail_publication.html", {
         "listings": listings,
     })
 

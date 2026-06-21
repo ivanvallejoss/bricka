@@ -2,7 +2,7 @@
 Sidebar de detalle — sticky en desktop, inline en mobile (ver property_detail.html).
 Todo carga inmediata. property y listings ya vienen resueltos desde property_detail view.
 {% endcomment %}
-<div class="space-y-4">
+<div class="flex flex-col gap-2">
 
     {# Estado + Características + Billing #}
     <div class="bg-surface border border-outline rounded-md overflow-hidden">
@@ -167,7 +167,7 @@ Todo carga inmediata. property y listings ya vienen resueltos desde property_det
         <div class="flex flex-col gap-4">
 
             {% if property.owner_contact %}
-            <div class="flex items-start gap-3 space-y-2">
+            <div class="flex items-start gap-3">
                 <div class="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0 mt-0.5">
                     {% include "icons/users.html" with size="15" class="text-primary-container" %}
                 </div>
@@ -181,7 +181,7 @@ Todo carga inmediata. property y listings ya vienen resueltos desde property_det
             {% endif %}
 
             {% if active_contract %}
-            <div class="flex items-start gap-3 pt-3 border-t border-outline"  space-y-2>
+            <div class="flex items-start gap-3 pt-3 border-t border-outline"  >
                 <div class="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0 mt-0.5">
                     {% include "icons/users.html" with size="15" class="text-primary-container" %}
                 </div>

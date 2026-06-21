@@ -29,35 +29,58 @@
         ">
         
             {# ── Thumbnail ─────────────────────────────────────────── #}
-            <td class="py-3 pl-4">
+            <td class="p-1 overflow-hidden shadow-[inset_-4px_0_6px_rgba(0,11,32,0.06)]">
                 {% if ctx.cover_url %}
                     <img
-                    src="{{ ctx.cover_url }}"
+                        src="{{ ctx.cover_url }}"
                         alt="{{ property.title|default:property.address_line }}"
                         loading="lazy"
-                        class="w-10 h-10 rounded object-cover shrink-0 bg-surface-container">
+                        class="block w-full h-full min-h-[68px] object-cover">
                 {% else %}
-                <div class="w-10 h-10 rounded bg-surface-container flex items-center justify-center shrink-0">
-                    {% include "icons/building2.html" with size="16" class="text-on-surface-variant" %}
+                    <div class="w-full h-full min-h-[68px] flex items-center justify-center
+                                bg-surface-container">
+                        {% include "icons/building2.html" with size="16" class="text-on-surface-variant" %}
                     </div>
-                    {% endif %}
-            </td>
-            
-            {# ── Título / Dirección ────────────────────────────────── #}
-            <td class="py-3 px-3 min-w-0">
-                <p class="text-[15px] font-medium text-on-surface truncate">
-                    {{ property.title|default:property.address_line }}
-                </p>
-                {% if property.title %}
-                <p class="text-xs text-on-surface-variant truncate mt-0.5">
-                    {{ property.address_line }}
-                    </p>
                 {% endif %}
             </td>
             
+            {# ── Título / Dirección ────────────────────────────────── #}
+            <td class="py-3 pl-3 pr-5 md:px-3 min-w-0">
+                <p class="text-[13px] md:text-[15px] font-medium text-on-surface truncate">
+                    {{ property.title|default:property.address_line }}
+                </p>
+                {% if property.title %}
+                <p class="hidden md:block text-xs text-on-surface-variant truncate mt-0.5">
+                    {{ property.address_line }}
+                </p>
+                {% endif %}
+                <div class="flex md:hidden flex-wrap gap-1 mt-1.5">
+                    {% if property.status == 'available' %}
+                        <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-success-bg text-success-text">Disponible</span>
+                    {% elif property.status == 'rented' %}
+                        <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-alquiler-bg text-alquiler-text">Alquilada</span>
+                    {% elif property.status == 'sold' %}
+                        <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-venta-bg text-venta-text">Vendida</span>
+                    {% elif property.status == 'unavailable' %}
+                        <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-surface-container text-on-surface-variant">No disponible</span>
+                    {% endif %}
+                    {% if ctx.contextual_badge %}
+                        {% with badge=ctx.contextual_badge %}
+                            <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium
+                                {% if badge.style == 'success' %}border border-success-text text-success-text
+                                {% elif badge.style == 'warning' %}border border-warning-text text-warning-text
+                                {% elif badge.style == 'danger' %}border border-danger-text text-danger-text
+                                {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+                                {{ badge.text }}
+                            </span>
+                        {% endwith %}
+                    {% endif %}
+                </div>
+            </td>
+            
             {# ── Badges ────────────────────────────────────────────── #}
-            <td class="py-3 px-3 pr-20">
-                <div class="flex flex-row gap-1.5 items-start justify-center">
+            <td class="hidden md:table-cell py-3 px-3">
+                <div class="flex flex-row gap-1.5 items-center justify-center">
                     
                     {# Badge 1 — Estado del modelo #}
                     {% if property.status == 'available' %}
@@ -96,7 +119,7 @@
             </td>
 
             {# ── Precio ────────────────────────────────────────────── #}
-            <td class="py-3 px-3 pr-center text-center">
+            <td class="py-3 px-3 text-right">
                 {% if ctx.display_price %}
                 <p class="text-sm font-medium text-on-surface tabular-nums">
                     ${{ ctx.display_price|floatformat:0 }}

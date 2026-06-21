@@ -3,7 +3,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}Bricka{% endblock %} — CRM</title>
 
     {# Bricolage Grotesque — pesos 300 400 500 600 #}
@@ -97,7 +97,7 @@
             </header>
 
             {# Área de contenido con scroll propio #}
-            <main class="flex-1 min-h-0 overflow-y-auto px-6 py-6 pb-24 md:pb-6">
+            <main class="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-6 pb-28 md:pb-6">
                 {% block content %}{% endblock %}
             </main>
             <div id="slide-over-container"></div>
@@ -107,8 +107,50 @@
     </div>
 
     {# ── Bottom nav — mobile only ─────────────────────────────────── #}
-    
+    {% with app=request.resolver_match.app_name %}
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-30
+                bg-primary border-t border-white/10 pb-safe">
+        <div class="h-16 grid grid-cols-5">
 
+            <a href="{% url 'properties:list' %}"
+               class="flex flex-col items-center justify-center gap-1 transition-colors
+                      {% if app == 'properties' %}text-white{% else %}text-sidebar-inactive hover:text-white{% endif %}">
+                {% include "icons/building2.html" with size="17" %}
+                <span class="text-[10px] font-medium">Propiedades</span>
+            </a>
+
+            <a href="{% url 'contact-list' %}"
+               class="flex flex-col items-center justify-center gap-1 transition-colors
+                      {% if '/contacts/' in request.path %}text-white{% else %}text-sidebar-inactive hover:text-white{% endif %}">
+                {% include "icons/users.html" with size="17" %}
+                <span class="text-[10px] font-medium">Contactos</span>
+            </a>
+
+            <a href="#"
+               class="flex flex-col items-center justify-center gap-1
+                      text-sidebar-inactive hover:text-white transition-colors">
+                {% include "icons/megaphone.html" with size="17" %}
+                <span class="text-[10px] font-medium">Publicaciones</span>
+            </a>
+
+            <a href="#"
+               class="flex flex-col items-center justify-center gap-1
+                      text-sidebar-inactive hover:text-white transition-colors">
+                {% include "icons/file-text.html" with size="17" %}
+                <span class="text-[10px] font-medium">Contratos</span>
+            </a>
+
+            <a href="#"
+               class="flex flex-col items-center justify-center gap-1
+                      text-sidebar-inactive hover:text-white transition-colors">
+                {% include "icons/receipt.html" with size="17" %}
+                <span class="text-[10px] font-medium">Facturación</span>
+            </a>
+
+        </div>
+    </nav>
+    {% endwith %}
+    
     {# ── Scripts ──────────────────────────────────────────────────── #}
     {# HTMX — defer para no bloquear render #}
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>

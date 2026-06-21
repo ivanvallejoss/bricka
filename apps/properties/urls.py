@@ -11,6 +11,6 @@ urlpatterns = [
     path("<uuid:pk>/slide-over/contacts/", views.slide_over_contacts, name="slide_over_contacts"),
     path("<uuid:pk>/slide-over/documents/", views.slide_over_documents, name="slide_over_documents"),
     path("<uuid:pk>/", views.property_detail, name="detail"), 
-    path("<uuid:pk>/publications/", views.detail_publications, name="detail_publications"),
+    path("<uuid:pk>/publications/", views.detail_publication, name="detail_publication"),
     path("<uuid:pk>/documents/", views.detail_documents, name="detail_documents"),
 ]
