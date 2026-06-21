@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 
 from apps.audit.selectors import get_entity_history
 from .models import Contact
@@ -12,6 +12,7 @@ class ContactFilters:
     role: str | None = None
     source: str | None = None
     assigned_agent_id: UUID | None = None
+    search: str | None = None
 
 
 def get_contact_list(filters: ContactFilters | None = None) -> QuerySet:
@@ -30,6 +31,11 @@ def get_contact_list(filters: ContactFilters | None = None) -> QuerySet:
         qs = qs.filter(source=filters.source)
     if filters.assigned_agent_id is not None:
         qs = qs.filter(assigned_agent_id=filters.assigned_agent_id)
+    if filters.search:
+        qs = qs.filter(
+            Q(full_name__icontains=filters.search) |
+            Q(phone__icontains=filters.search)
+        )
 
     return qs
 
@@ -55,3 +61,11 @@ def get_contact_history(contact_id: UUID) -> QuerySet:
     Delega a audit/selectors — contacts no importa AuditLog directamente.
     """
     return get_entity_history(Contact.audit_entity_type(), contact_id)
+
+
+def get_search_preferences_for_contact(contact_id: UUID) -> QuerySet:
+    """
+    Devuelve las preferencias del contacto.
+    Utilizado en el template `contact_detail`
+    """
+    return SearchPreference.objects.filter(contact_id=contact_id, active=True)

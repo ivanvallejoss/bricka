@@ -87,6 +87,14 @@ def property_list(request):
     else:
         next_page_url = None
 
+    if request.htmx:
+        return render(request, "properties/partials/_property_rows.html", {
+            "properties": property_contexts,
+            "total_count": paginator.count,
+            "page_obj": page_obj,
+            "next_page_url": next_page_url,
+        })
+
     return render(request, "properties/property_list.html", {
         "properties": property_contexts,
         "total_count": paginator.count,

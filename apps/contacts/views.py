@@ -11,9 +11,19 @@ from .forms import ContactForm
 from .models import Contact
 from .selectors import ContactFilters, get_contact_detail, get_contact_history, get_contact_list
 from .services import archive_contact, create_contact, restore_contact, update_contact
+from .selectors import get_search_preferences_for_contact
+
+from apps.contracts.selectors import get_contract_list, ContractFilters
+
+from apps.common.storage import generate_document_url
+
+from apps.documents.selectors import get_document_list, DocumentFilters
+from apps.documents.context import DocumentContext
+from apps.documents.utils import categorize_document
+
+from apps.properties.selectors import get_properties_for_owner
 
 
-@login_required
 def contact_list(request):
     """
     Lista de contactos con filtros opcionales por query params.
@@ -29,6 +39,7 @@ def contact_list(request):
         role=request.GET.get("role") or None,
         source=request.GET.get("source") or None,
         assigned_agent_id=request.GET.get("assigned_agent_id") or None,
+        search=request.GET.get("q") or None,
     )
     context = {
         "contacts": get_contact_list(filters=filters),
@@ -41,7 +52,6 @@ def contact_list(request):
     return render(request, "contacts/contact_list.html", context)
 
 
-@login_required
 def contact_detail(request, contact_id):
     """
     Detalle de un contacto activo con historial de audit.
@@ -58,16 +68,33 @@ def contact_detail(request, contact_id):
     except Contact.DoesNotExist:
         raise Http404
 
+    owned_properties = get_properties_for_owner(contact_id=contact_id)
+    tenant_contracts = get_contract_list(ContractFilters(tenant_contact_id=contact_id))
+
+    raw_documents = get_document_list(DocumentFilters(contact_id=contact_id))
+    documents = [
+        DocumentContext(
+            document=doc,
+            signed_url=generate_document_url(doc.r2_key),
+            file_category=categorize_document(doc.content_type),
+        )
+        for doc in raw_documents
+    ]
+
+    search_preferences = get_search_preferences_for_contact(contact_id=contact_id)
+
     context = {
         "contact": contact,
-        "history": get_contact_history(contact_id),
+        "owned_properties": owned_properties,
+        "tenant_contracts": tenant_contracts,
+        "documents": documents,
+        "search_preferences": search_preferences
     }
     if request.htmx:
         return render(request, "contacts/partials/contact_detail_panel.html", context)
     return render(request, "contacts/contact_detail.html", context)
 
 
-@login_required
 def contact_create(request):
     """
     Formulario de creación de contacto.
@@ -105,10 +132,10 @@ def contact_create(request):
             if request.htmx:
                 response = HttpResponse(status=204)
                 response["HX-Redirect"] = reverse(
-                    "contact-detail", kwargs={"contact_id": contact.pk}
+                    "contacts:contact-detail", kwargs={"contact_id": contact.pk}
                 )
                 return response
-            return redirect(reverse("contact-detail", kwargs={"contact_id": contact.pk}))
+            return redirect(reverse("contacts:contact-detail", kwargs={"contact_id": contact.pk}))
         if request.htmx:
             return render(request, "contacts/partials/contact_form_modal.html", {
                 "form": form,
@@ -128,7 +155,6 @@ def contact_create(request):
     })
 
 
-@login_required
 def contact_edit(request, contact_id):
     """
     Formulario de edición de contacto existente.
@@ -171,10 +197,10 @@ def contact_edit(request, contact_id):
             if request.htmx:
                 response = HttpResponse(status=204)
                 response["HX-Redirect"] = reverse(
-                    "contact-detail", kwargs={"contact_id": contact.pk}
+                    "contacts:contact-detail", kwargs={"contact_id": contact.pk}
                 )
                 return response
-            return redirect(reverse("contact-detail", kwargs={"contact_id": contact.pk}))
+            return redirect(reverse("contacts:contact-detail", kwargs={"contact_id": contact.pk}))
         if request.htmx:
             return render(request, "contacts/partials/contact_form_modal.html", {
                 "form": form,
@@ -197,7 +223,6 @@ def contact_edit(request, contact_id):
     })
 
 
-@login_required
 def contact_archive(request, contact_id):
     """
     Acción de archivado. Solo POST.
@@ -215,13 +240,12 @@ def contact_archive(request, contact_id):
     try:
         archive_contact(contact, actor=request.user)
         response = HttpResponse(status=204)
-        response["HX-Redirect"] = reverse("contact-list")
+        response["HX-Redirect"] = reverse("contacts:contact-list")
         return response
     except ContactHasOpenDeals as e:
         return render(request, "partials/modal_error.html", {"error": str(e)})
 
 
-@login_required
 def contact_restore(request, contact_id):
     """
     Acción de restauración. Solo POST.
@@ -238,6 +262,6 @@ def contact_restore(request, contact_id):
     restore_contact(contact, actor=request.user)
     response = HttpResponse(status=204)
     response["HX-Redirect"] = reverse(
-        "contact-detail", kwargs={"contact_id": contact_id}
+        "contacts:contact-detail", kwargs={"contact_id": contact_id}
     )
     return response

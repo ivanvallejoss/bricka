@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Contactos{% endblock %}
+
+{% block page_title %}
+    <h1 class="text-[20px] font-semibold tracking-tight text-on-surface">Contactos</h1>
+{% endblock %}
+
+{% block page_actions %}
+    <button type="button"
+            hx-get="{% url 'contacts:contact-create' %}"
+            hx-target="#modal-container"
+            hx-swap="innerHTML"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded bg-primary-container
+                   text-on-primary text-sm font-medium transition-colors hover:bg-primary">
+        {% include "icons/plus.html" with size="15" %}
+        Nuevo contacto
+    </button>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-4">
+
+    {# ── Filtros ──────────────────────────────────────────────── #}
+    <form
+        x-data="{ role: '{{ filters.role|default:'' }}' }"
+        hx-get="{% url 'contacts:contact-list' %}"
+        hx-target="#contact-table-body"
+        hx-swap="innerHTML"
+        hx-push-url="true">
+
+        <input type="hidden" name="role" :value="role">
+
+        {# Buscador #}
+        <div class="relative mb-3">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant">
+                {% include "icons/search.html" with size="15" %}
+            </div>
+            <input
+                type="text"
+                name="q"
+                value="{{ request.GET.q|default:'' }}"
+                @input.debounce.400ms="$el.form.requestSubmit()"
+                placeholder="Buscar por nombre o teléfono..."
+                autocomplete="off"
+                class="w-full pl-9 pr-4 py-2 text-sm bg-surface border border-outline rounded
+                       focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                       focus:border-primary-container placeholder:text-on-surface-variant
+                       transition-colors">
+        </div>
+
+        {# Pills de rol + select de fuente en la misma fila #}
+        <div class="flex items-center gap-1.5 flex-wrap">
+            <button type="button"
+                    @click="role = ''; $nextTick(() => $el.form.requestSubmit())"
+                    :class="role === ''
+                        ? 'bg-primary-container text-on-primary'
+                        : 'bg-surface text-on-surface-variant border border-outline hover:bg-surface-container-low'"
+                    class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">
+                Todos
+            </button>
+            {% for value, label in role_choices %}
+            <button type="button"
+                    @click="role = '{{ value }}'; $nextTick(() => $el.form.requestSubmit())"
+                    :class="role === '{{ value }}'
+                        ? 'bg-primary-container text-on-primary'
+                        : 'bg-surface text-on-surface-variant border border-outline hover:bg-surface-container-low'"
+                    class="px-4 py-1.5 rounded-full text-sm font-medium transition-colors">
+                {{ label }}
+            </button>
+            {% endfor %}
+
+            <select name="source"
+                    @change="$el.form.requestSubmit()"
+                    class="ml-auto text-sm bg-surface border border-outline rounded px-3 py-1.5
+                           focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                           focus:border-primary-container text-on-surface transition-colors cursor-pointer">
+                <option value="">Todas las fuentes</option>
+                {% for value, label in source_choices %}
+                <option value="{{ value }}" {% if filters.source == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+    </form>
+
+    {# ── Tabla ─────────────────────────────────────────────────── #}
+    <div class="bg-surface border border-outline rounded-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full table-fixed" x-data>
+                <colgroup>
+                    <col class="w-12">             {# avatar #}
+                    <col>                           {# nombre #}
+                    <col class="w-0 md:w-28">      {# rol: oculto mobile #}
+                    <col class="w-0 md:w-28">      {# fuente: oculto mobile #}
+                    <col class="w-32 md:w-36">     {# teléfono #}
+                    <col class="w-0 md:w-20">      {# acciones: oculto mobile #}
+                </colgroup>
+                <thead>
+                    <tr class="border-b border-outline bg-surface-container-low/40">
+                        <th class="p-0"></th>
+                        <th class="py-3 px-3 text-left text-[11px] font-medium uppercase
+                                   tracking-[0.07em] text-on-surface-variant">
+                            Nombre
+                        </th>
+                        <th class="hidden md:table-cell py-3 px-3 text-left text-[11px] font-medium uppercase
+                                   tracking-[0.07em] text-on-surface-variant">
+                            Rol
+                        </th>
+                        <th class="hidden md:table-cell py-3 px-3 text-left text-[11px] font-medium uppercase
+                                   tracking-[0.07em] text-on-surface-variant">
+                            Fuente
+                        </th>
+                        <th class="py-3 px-3 text-left text-[11px] font-medium uppercase
+                                   tracking-[0.07em] text-on-surface-variant">
+                            Teléfono
+                        </th>
+                        <th class="hidden md:table-cell py-3 pr-4"></th>
+                    </tr>
+                </thead>
+                <tbody id="contact-table-body">
+                    {% include "contacts/partials/contact_list_table.html" %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── Counter ───────────────────────────────────────────────── #}
+    <p class="text-xs text-on-surface-variant px-1">
+        <span id="contact-counter">
+            {{ contacts|length }} contacto{{ contacts|length|pluralize:"s" }}
+        </span>
+    </p>
+
+</div>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% comment %}
+Partial de filas de contactos.
+1. Include inicial en contact_list.html
+2. Respuesta HTMX a cambios de filtro (request.htmx = True)
+   Target: #contact-table-body
+{% endcomment %}
+
+{% for contact in contacts %}
+<tr
+    data-detail-url="{% url 'contacts:contact-detail' contact.pk %}"
+    @click="window.location.href = $el.dataset.detailUrl"
+    class="group border-b border-outline last:border-0 transition-colors
+           hover:bg-surface-container-lowest cursor-pointer">
+
+    {# ── Avatar ──────────────────────────────────────────────── #}
+    <td class="p-0 overflow-hidden">
+        <div class="w-full h-full min-h-[60px] flex items-center justify-center
+                    {% if contact.role == 'owner' %}bg-venta-bg
+                    {% elif contact.role == 'tenant' %}bg-alquiler-bg
+                    {% else %}bg-surface-container{% endif %}">
+            <span class="text-[14px] font-semibold
+                         {% if contact.role == 'owner' %}text-venta-text
+                         {% elif contact.role == 'tenant' %}text-alquiler-text
+                         {% else %}text-on-surface-variant{% endif %}">
+                {{ contact.full_name|slice:":1"|upper }}
+            </span>
+        </div>
+    </td>
+
+    {# ── Nombre + mobile badges ───────────────────────────────── #}
+    <td class="py-3 pl-3 pr-4 md:px-3 min-w-0">
+        <p class="text-[13px] md:text-[14px] font-medium text-on-surface truncate">
+            {{ contact.full_name }}
+        </p>
+        {% if contact.contact_type == 'company' %}
+        <p class="text-[11px] text-on-surface-variant mt-0.5">Empresa</p>
+        {% endif %}
+        {% if contact.role %}
+        <div class="flex md:hidden mt-1.5">
+            <span class="px-1.5 py-0.5 rounded-full text-[11px] font-medium
+                {% if contact.role == 'owner' %}bg-venta-bg text-venta-text
+                {% elif contact.role == 'tenant' %}bg-alquiler-bg text-alquiler-text
+                {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+                {{ contact.get_role_display }}
+            </span>
+        </div>
+        {% endif %}
+    </td>
+
+    {# ── Rol — desktop only ───────────────────────────────────── #}
+    <td class="hidden md:table-cell py-3 px-3">
+        {% if contact.role %}
+        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
+            {% if contact.role == 'owner' %}bg-venta-bg text-venta-text
+            {% elif contact.role == 'tenant' %}bg-alquiler-bg text-alquiler-text
+            {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+            {{ contact.get_role_display }}
+        </span>
+        {% else %}
+        <span class="text-sm text-on-surface-variant">—</span>
+        {% endif %}
+    </td>
+
+    {# ── Fuente — desktop only ────────────────────────────────── #}
+    <td class="hidden md:table-cell py-3 px-3">
+        <p class="text-sm text-on-surface-variant">{{ contact.get_source_display }}</p>
+    </td>
+
+    {# ── Teléfono ─────────────────────────────────────────────── #}
+    <td class="py-3 px-3">
+        {% if contact.phone %}
+        <p class="text-sm text-on-surface tabular-nums">{{ contact.phone }}</p>
+        {% else %}
+        <p class="text-sm text-on-surface-variant">—</p>
+        {% endif %}
+    </td>
+
+    {# ── Acciones — desktop only ──────────────────────────────── #}
+    <td class="hidden md:table-cell py-3 pr-4">
+        <div class="flex items-center justify-end
+                    opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <a href="{% url 'contacts:contact-detail' contact.pk %}"
+               @click.stop
+               class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium
+                      bg-surface-container text-on-surface hover:bg-surface-container-high
+                      transition-colors">
+                Ver
+                {% include "icons/arrow-right.html" with size="12" %}
+            </a>
+        </div>
+    </td>
+
+</tr>
+{% empty %}
+<tr>
+    <td colspan="6" class="py-20 text-center">
+        <p class="text-sm text-on-surface-variant">
+            No hay contactos que coincidan con los filtros aplicados.
+        </p>
+    </td>
+</tr>
+{% endfor %}
+
+{% if request.htmx %}
+<span id="contact-counter" hx-swap-oob="true">
+    {{ contacts|length }} contacto{{ contacts|length|pluralize:"s" }}
+</span>
+{% endif %}

@@ -118,3 +118,11 @@ def get_property_media(property_id: UUID) -> QuerySet[PropertyMedia]:
     if not Property.objects.filter(pk=property_id).exists():
         raise Property.DoesNotExist
     return PropertyMedia.objects.filter(property_id=property_id)
+
+
+def get_properties_for_owner(contact_id: UUID) -> QuerySet:
+    """
+    Devuelve las propiedades que le pertenecen al contacto si existen.
+    Utilizado en el template `contact_detail`
+    """
+    return Property.objects.filter(owner_contact_id=contact_id)

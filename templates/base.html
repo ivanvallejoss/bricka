@@ -39,13 +39,13 @@
                     Inicio
                 </a>
 
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                <a href="{% url 'properties:list' %}" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
                         {% if app == 'properties' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
                     {% include "icons/building2.html" with size="17" %}
                     Propiedades
                 </a>
 
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                <a href="{% url 'contacts:contact-list' %}" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
                         {% if app == 'contacts' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
                     {% include "icons/users.html" with size="17" %}
                     Contactos
@@ -70,7 +70,6 @@
                 </a>
 
             </nav>
-
             {# Configuración — pie del sidebar #}
             <div class="px-3 py-4 shrink-0 border-t border-white/10">
                 <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
@@ -97,7 +96,7 @@
             </header>
 
             {# Área de contenido con scroll propio #}
-            <main class="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-6 pb-28 md:pb-6">
+            <main id="main-content" class="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-6 pb-28 md:pb-6">
                 {% block content %}{% endblock %}
             </main>
             <div id="slide-over-container"></div>
@@ -119,9 +118,9 @@
                 <span class="text-[10px] font-medium">Propiedades</span>
             </a>
 
-            <a href="{% url 'contact-list' %}"
+            <a href="{% url 'contacts:contact-list' %}"
                class="flex flex-col items-center justify-center gap-1 transition-colors
-                      {% if '/contacts/' in request.path %}text-white{% else %}text-sidebar-inactive hover:text-white{% endif %}">
+                      {% if app == 'contacts' in request.path %}text-white{% else %}text-sidebar-inactive hover:text-white{% endif %}">
                 {% include "icons/users.html" with size="17" %}
                 <span class="text-[10px] font-medium">Contactos</span>
             </a>
@@ -160,5 +159,6 @@
     <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>
 
     {% block extra_js %}{% endblock %}
+    <div id="modal-container"></div>
 </body>
 </html>
