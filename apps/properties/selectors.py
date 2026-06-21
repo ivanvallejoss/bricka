@@ -41,9 +41,12 @@ def get_property_list(
         qs = qs.filter(status__in=filters.status)
 
     if filters.operation_type is not None:
-        qs = qs.filter(
-            published_listing_subquery(filters.operation_type)
-        )
+        if filters.operation_type == 'rent':
+            qs = qs.filter(
+                Q(status='rented') | published_listing_subquery('rent')
+            )
+        else:
+            qs = qs.filter(published_listing_subquery(filters.operation_type))
 
     if filters.property_type is not None:
         qs = qs.filter(property_type=filters.property_type)
