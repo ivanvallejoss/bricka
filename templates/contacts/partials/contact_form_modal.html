@@ -1,0 +1,281 @@
+{% comment %}
+Modal de creación/edición de contacto.
+Cargado via HTMX GET en #modal-container.
+Submit vía HTMX POST — éxito: HX-Redirect, error: re-renderiza este modal con errores inline.
+{% endcomment %}
+<div
+    x-data="{ open: false }"
+    x-init="
+        $nextTick(() => { open = true });
+        $watch('open', v => {
+            if (!v) setTimeout(() => {
+                document.getElementById('modal-container').innerHTML = ''
+            }, 200)
+        });
+    "
+    @keydown.escape.window="open = false"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    :class="{ 'pointer-events-none': !open }">
+
+    {# Backdrop #}
+    <div
+        x-show="open"
+        x-transition:enter="transition-opacity ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="open = false"
+        style="pointer-events: auto;"
+        class="absolute inset-0 bg-primary/30">
+    </div>
+
+    {# Dialog #}
+    <div
+        x-show="open"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        style="pointer-events: auto;"
+        class="relative w-full max-w-xl bg-surface rounded-lg shadow-xl border border-outline overflow-hidden">
+
+        {# Header #}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline shrink-0">
+            <h2 class="text-[15px] font-semibold text-on-surface">
+                {% if is_create %}Nuevo contacto{% else %}Editar contacto{% endif %}
+            </h2>
+            <button type="button" @click="open = false"
+                    class="p-1.5 rounded text-on-surface-variant hover:text-on-surface
+                           hover:bg-surface-container transition-colors">
+                {% include "icons/x.html" with size="16" %}
+            </button>
+        </div>
+
+        {# Form #}
+        <form
+            hx-post="{% if is_create %}{% url 'contacts:contact-create' %}{% else %}{% url 'contacts:contact-edit' contact.pk %}{% endif %}"
+            hx-target="#modal-container"
+            hx-swap="innerHTML">
+
+            <div class="px-6 py-5 flex flex-col gap-4 max-h-[65vh] overflow-y-auto">
+
+                {# Errores globales #}
+                {% if form.non_field_errors %}
+                <div class="p-3 rounded-md bg-danger-bg border border-danger-text/20">
+                    {% for error in form.non_field_errors %}
+                    <p class="text-sm text-danger-text">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {# Tipo de contacto — radio pills #}
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Tipo
+                    </label>
+                    <div class="flex gap-2">
+                        {% for value, label in form.contact_type.field.choices %}
+                        <label class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md
+                                      border cursor-pointer transition-colors text-sm
+                                      has-checked:bg-primary-container has-checked:border-primary-container
+                                      has-checked:text-on-primary
+                                      border-outline text-on-surface-variant hover:bg-surface-container">
+                            <input type="radio" name="contact_type" value="{{ value }}"
+                                   {% if form.contact_type.value == value %}checked{% endif %}
+                                   class="sr-only">
+                            {{ label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {# Nombre #}
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Nombre completo *
+                    </label>
+                    <input type="text" name="full_name"
+                           value="{{ form.full_name.value|default:'' }}"
+                           placeholder="Ej: Ricardo Velázquez"
+                           class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors
+                                  {% if form.full_name.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% if form.full_name.errors %}
+                    <p class="text-xs text-danger-text">{{ form.full_name.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                {# Teléfono + Email #}
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Teléfono
+                        </label>
+                        <input type="text" name="phone"
+                               value="{{ form.phone.value|default:'' }}"
+                               placeholder="Ej: 3624-100200"
+                               class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                      focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                      focus:border-primary-container transition-colors">
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Email
+                        </label>
+                        <input type="email" name="email"
+                               value="{{ form.email.value|default:'' }}"
+                               placeholder="Ej: contacto@email.com"
+                               class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                      focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                      focus:border-primary-container transition-colors">
+                    </div>
+                </div>
+
+                {# Tipo documento + Número #}
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Tipo de documento
+                        </label>
+                        <select name="document_type"
+                                class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                       focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                       focus:border-primary-container transition-colors cursor-pointer">
+                            <option value="">—</option>
+                            {% for value, label in form.document_type.field.choices %}
+                            {% if value %}
+                            <option value="{{ value }}"
+                                    {% if form.document_type.value == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        {% if form.document_type.errors %}
+                        <p class="text-xs text-danger-text">{{ form.document_type.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Número
+                        </label>
+                        <input type="text" name="document_number"
+                               value="{{ form.document_number.value|default:'' }}"
+                               placeholder="Ej: 18345678"
+                               class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                      focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                      focus:border-primary-container transition-colors
+                                      {% if form.document_number.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                        {% if form.document_number.errors %}
+                        <p class="text-xs text-danger-text">{{ form.document_number.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Rol + Fuente #}
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Rol
+                        </label>
+                        <select name="role"
+                                class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                       focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                       focus:border-primary-container transition-colors cursor-pointer">
+                            <option value="">Sin rol</option>
+                            {% for value, label in form.role.field.choices %}
+                            {% if value %}
+                            <option value="{{ value }}"
+                                    {% if form.role.value == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Fuente
+                        </label>
+                        <select name="source"
+                                class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                       focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                       focus:border-primary-container transition-colors cursor-pointer">
+                            {% for value, label in form.source.field.choices %}
+                            <option value="{{ value }}"
+                                    {% if form.source.value == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                {# Detalle de fuente #}
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Detalle de fuente
+                    </label>
+                    <input type="text" name="source_detail"
+                           value="{{ form.source_detail.value|default:'' }}"
+                           placeholder="Ej: Referido por Juan Pérez"
+                           class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors">
+                </div>
+
+                {# Agente asignado #}
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Agente asignado
+                    </label>
+                    <select name="assigned_agent"
+                            class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                   focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                   focus:border-primary-container transition-colors cursor-pointer">
+                        <option value="">Sin asignar</option>
+                        {% for agent in form.assigned_agent.field.queryset %}
+                        <option value="{{ agent.pk }}"
+                                {% if form.assigned_agent.value|stringformat:"s" == agent.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ agent.get_full_name|default:agent.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Notas #}
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Notas
+                    </label>
+                    <textarea name="notes" rows="3"
+                              placeholder="Observaciones adicionales..."
+                              class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                     focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                     focus:border-primary-container transition-colors resize-none">{{ form.notes.value|default:'' }}</textarea>
+                </div>
+
+            </div>
+
+            {# Footer #}
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-outline shrink-0">
+                <button type="button" @click="open = false"
+                        class="px-4 py-2 text-sm font-medium text-on-surface-variant
+                               hover:text-on-surface transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 rounded bg-primary-container text-on-primary
+                               text-sm font-medium hover:bg-primary transition-colors">
+                    {% if is_create %}Crear contacto{% else %}Guardar cambios{% endif %}
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_create %}Nuevo contacto{% else %}Editar {{ contact.full_name }}{% endif %}{% endblock %}
+
+{% block page_title %}
+    <a href="{% url 'contacts:contact-list' %}"
+       class="flex items-center gap-2 text-sm font-medium text-on-surface-variant
+              hover:text-on-surface transition-colors">
+        {% include "icons/arrow-left.html" with size="16" %}
+        Contactos
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-xl">
+    <div class="bg-surface border border-outline rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-outline">
+            <h1 class="text-[15px] font-semibold text-on-surface">
+                {% if is_create %}Nuevo contacto{% else %}Editar contacto{% endif %}
+            </h1>
+        </div>
+        <form method="post" class="px-6 py-5 flex flex-col gap-4">
+            {% csrf_token %}
+            {# Mismo contenido del modal — reutiliza la estructura de campos #}
+            {% include "contacts/partials/contact_form_modal.html" %}
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -4,7 +4,7 @@ from uuid import UUID
 from django.db.models import QuerySet, Q
 
 from apps.audit.selectors import get_entity_history
-from .models import Contact
+from .models import Contact, SearchPreference
 
 
 @dataclass

@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}{{ contact.full_name }}{% endblock %}
+
+{% block page_title %}
+    <a href="{% url 'contacts:contact-list' %}"
+       class="flex items-center gap-2 text-sm font-medium text-on-surface-variant
+              hover:text-on-surface transition-colors">
+        {% include "icons/arrow-left.html" with size="16" %}
+        Contactos
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+
+    {# ── Columna principal ────────────────────────────────────── #}
+    <div class="flex flex-col gap-4 min-w-0">
+
+        {# Header — avatar + nombre + badges #}
+        <div class="bg-surface border border-outline rounded-lg p-5">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 rounded-full flex items-center justify-center shrink-0
+                            {% if contact.role == 'owner' %}bg-venta-bg
+                            {% elif contact.role == 'tenant' %}bg-alquiler-bg
+                            {% else %}bg-surface-container{% endif %}">
+                    <span class="text-[22px] font-semibold
+                                 {% if contact.role == 'owner' %}text-venta-text
+                                 {% elif contact.role == 'tenant' %}text-alquiler-text
+                                 {% else %}text-on-surface-variant{% endif %}">
+                        {{ contact.full_name|slice:":1"|upper }}
+                    </span>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-[18px] font-semibold text-on-surface leading-tight truncate">
+                        {{ contact.full_name }}
+                    </h1>
+                    <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
+                                     bg-surface-container text-on-surface-variant">
+                            {{ contact.get_contact_type_display }}
+                        </span>
+                        {% if contact.role %}
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
+                            {% if contact.role == 'owner' %}bg-venta-bg text-venta-text
+                            {% elif contact.role == 'tenant' %}bg-alquiler-bg text-alquiler-text
+                            {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+                            {{ contact.get_role_display }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Sidebar mobile — inline después del header #}
+        <div class="lg:hidden">
+            {% include "contacts/partials/_contact_detail_sidebar.html" %}
+        </div>
+
+        {# Información #}
+        <div class="bg-surface border border-outline rounded-lg p-5">
+            <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-4">
+                Información
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                <div>
+                    <p class="text-[11px] text-on-surface-variant mb-0.5">Teléfono</p>
+                    <p class="text-sm font-medium text-on-surface">{{ contact.phone|default:"—" }}</p>
+                </div>
+                <div>
+                    <p class="text-[11px] text-on-surface-variant mb-0.5">Email</p>
+                    <p class="text-sm font-medium text-on-surface">{{ contact.email|default:"—" }}</p>
+                </div>
+                {% if contact.document_type and contact.document_number %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant mb-0.5">Documento</p>
+                    <p class="text-sm font-medium text-on-surface">
+                        {{ contact.get_document_type_display }} {{ contact.document_number }}
+                    </p>
+                </div>
+                {% endif %}
+                <div>
+                    <p class="text-[11px] text-on-surface-variant mb-0.5">Fuente</p>
+                    <p class="text-sm font-medium text-on-surface">
+                        {{ contact.get_source_display }}
+                        {% if contact.source_detail %}
+                        <span class="font-normal text-on-surface-variant"> — {{ contact.source_detail }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            {% if contact.notes %}
+            <div class="mt-4 pt-4 border-t border-outline">
+                <p class="text-[11px] text-on-surface-variant mb-1.5">Notas</p>
+                <p class="text-sm text-on-surface leading-relaxed">{{ contact.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {# Propiedades #}
+        {% if owned_properties or tenant_contracts %}
+        <div class="bg-surface border border-outline rounded-lg p-5">
+            <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-4">
+                Propiedades
+            </p>
+            <div class="flex flex-col gap-2">
+
+                {% for prop in owned_properties %}
+                <a href="{% url 'properties:detail' prop.pk %}"
+                   class="flex items-center justify-between gap-3 p-3 rounded-md
+                          bg-surface-container-low border border-outline
+                          hover:bg-surface-container transition-colors">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-on-surface truncate">
+                            {{ prop.title|default:prop.address_line }}
+                        </p>
+                        {% if prop.title %}
+                        <p class="text-[11px] text-on-surface-variant mt-0.5 truncate">
+                            {{ prop.address_line }}
+                        </p>
+                        {% endif %}
+                        <p class="text-[11px] text-on-surface-variant mt-0.5">Propietario</p>
+                    </div>
+                    <span class="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium
+                        {% if prop.status == 'available' %}bg-success-bg text-success-text
+                        {% elif prop.status == 'rented' %}bg-alquiler-bg text-alquiler-text
+                        {% elif prop.status == 'sold' %}bg-venta-bg text-venta-text
+                        {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+                        {% if prop.status == 'available' %}Disponible
+                        {% elif prop.status == 'rented' %}Alquilada
+                        {% elif prop.status == 'sold' %}Vendida
+                        {% else %}No disponible{% endif %}
+                    </span>
+                </a>
+                {% endfor %}
+
+                {% for contract in tenant_contracts %}
+                <a href="{% url 'properties:detail' contract.property.pk %}"
+                   class="flex items-center justify-between gap-3 p-3 rounded-md
+                          bg-surface-container-low border border-outline
+                          hover:bg-surface-container transition-colors">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-on-surface truncate">
+                            {{ contract.property.title|default:contract.property.address_line }}
+                        </p>
+                        {% if contract.property.title %}
+                        <p class="text-[11px] text-on-surface-variant mt-0.5 truncate">
+                            {{ contract.property.address_line }}
+                        </p>
+                        {% endif %}
+                        <p class="text-[11px] text-on-surface-variant mt-0.5">
+                            Inquilino — {{ contract.get_status_display|lower }}
+                        </p>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <p class="text-sm font-medium text-on-surface tabular-nums">
+                            ${{ contract.current_price|floatformat:0 }}
+                        </p>
+                        <p class="text-[11px] text-on-surface-variant">/ mes</p>
+                    </div>
+                </a>
+                {% endfor %}
+
+            </div>
+        </div>
+        {% endif %}
+
+        {# Intereses de búsqueda #}
+        {% if search_preferences %}
+        <div class="bg-surface border border-outline rounded-lg p-5">
+            <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-4">
+                Intereses de búsqueda
+            </p>
+            <div class="flex flex-col gap-2">
+                {% for pref in search_preferences %}
+                <div class="p-3 rounded-md bg-surface-container-low border border-outline">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
+                                     bg-surface-container text-on-surface-variant">
+                            {{ pref.get_operation_type_display }}
+                        </span>
+                        {% if pref.price_min or pref.price_max %}
+                        <span class="text-[11px] text-on-surface-variant">
+                            {% if pref.price_min %}desde ${{ pref.price_min|floatformat:0 }}{% endif %}
+                            {% if pref.price_max %}hasta ${{ pref.price_max|floatformat:0 }}{% endif %}
+                            {{ pref.currency }}
+                        </span>
+                        {% endif %}
+                        {% if pref.bedrooms_min %}
+                        <span class="text-[11px] text-on-surface-variant">
+                            {{ pref.bedrooms_min }}+ dorm.
+                        </span>
+                        {% endif %}
+                        {% if pref.area_m2_min %}
+                        <span class="text-[11px] text-on-surface-variant">
+                            {{ pref.area_m2_min|floatformat:0 }}+ m²
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% if pref.neighborhoods %}
+                    <p class="text-[11px] text-on-surface-variant mt-1.5">
+                        Barrios: {{ pref.neighborhoods|join:", " }}
+                    </p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    {# ── Sidebar — desktop sticky ─────────────────────────────── #}
+    <div class="hidden lg:block">
+        <div class="sticky top-6">
+            {% include "contacts/partials/_contact_detail_sidebar.html" %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

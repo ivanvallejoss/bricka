@@ -1,0 +1,168 @@
+{% comment %}
+Sidebar de detalle de contacto.
+Incluido dos veces en contact_detail.html:
+  - mobile: inline después del header (lg:hidden)
+  - desktop: sticky en segunda columna (hidden lg:block)
+Contexto requerido: contact, documents, recent_billing
+{% endcomment %}
+<div class="flex flex-col gap-4">
+
+    {# ── Acciones ─────────────────────────────────────────────── #}
+    <div class="bg-surface border border-outline rounded-lg p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Acciones
+        </p>
+        <div class="flex flex-col gap-2">
+
+            <button type="button"
+                    hx-get="{% url 'contacts:contact-edit' contact.pk %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
+                    class="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded
+                           border border-outline text-sm font-medium text-on-surface
+                           hover:bg-surface-container transition-colors">
+                Editar contacto
+            </button>
+
+            <div x-data="{ confirming: false }">
+                <button x-show="!confirming"
+                        type="button"
+                        @click="confirming = true"
+                        class="w-full px-3 py-2 rounded border border-danger-text/30
+                               text-sm font-medium text-danger-text
+                               hover:bg-danger-bg transition-colors">
+                    Archivar
+                </button>
+                <div x-show="confirming" x-cloak class="flex items-center gap-2">
+                    <span class="text-sm text-on-surface-variant shrink-0">¿Confirmar?</span>
+                    <button type="button"
+                            @click="confirming = false"
+                            class="flex-1 px-3 py-2 rounded border border-outline text-sm
+                                   font-medium text-on-surface-variant
+                                   hover:bg-surface-container transition-colors">
+                        No
+                    </button>
+                    <button type="button"
+                            hx-post="{% url 'contacts:contact-archive' contact.pk %}"
+                            hx-target="#archive-error"
+                            hx-swap="innerHTML"
+                            @click="confirming = false"
+                            class="flex-1 px-3 py-2 rounded bg-danger-bg border border-danger-text/30
+                                   text-sm font-medium text-danger-text
+                                   hover:bg-danger-text hover:text-white transition-colors">
+                        Sí
+                    </button>
+                </div>
+            </div>
+
+            <div id="archive-error"></div>
+        </div>
+    </div>
+
+    {# ── Metadata ─────────────────────────────────────────────── #}
+    <div class="bg-surface border border-outline rounded-lg p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Detalles
+        </p>
+        <div class="flex flex-col gap-2.5">
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant">Creado</p>
+                <p class="text-[12px] font-medium text-on-surface tabular-nums">
+                    {{ contact.created_at|date:"d/m/Y" }}
+                </p>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant">Modificado</p>
+                <p class="text-[12px] font-medium text-on-surface tabular-nums">
+                    {{ contact.updated_at|date:"d/m/Y" }}
+                </p>
+            </div>
+            {% if contact.assigned_agent %}
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant">Agente</p>
+                <p class="text-[12px] font-medium text-on-surface truncate">
+                    {{ contact.assigned_agent.get_full_name|default:contact.assigned_agent.username }}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Documentos ───────────────────────────────────────────── #}
+    {% if documents %}
+    <div class="bg-surface border border-outline rounded-lg p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Documentos
+        </p>
+        <div class="flex flex-col gap-1.5">
+            {% for ctx in documents %}
+            {% with doc=ctx.document %}
+            <a href="{{ ctx.signed_url }}"
+               {% if ctx.file_category == 'pdf' or ctx.file_category == 'image' %}
+               target="_blank" rel="noopener noreferrer"
+               {% else %}
+               download="{{ doc.original_filename }}"
+               {% endif %}
+               class="flex items-center gap-3 py-2.5 px-3 rounded-md
+                      bg-surface-container-low border border-outline
+                      hover:bg-surface-container transition-colors">
+
+                <div class="shrink-0 w-7 h-7 rounded flex items-center justify-center
+                            {% if ctx.file_category == 'pdf' %}bg-danger-bg
+                            {% elif ctx.file_category == 'word' %}bg-alquiler-bg
+                            {% else %}bg-surface-container{% endif %}">
+                    {% if ctx.file_category == 'image' %}
+                        {% include "icons/image.html" with size="14" class="text-on-surface-variant" %}
+                    {% elif ctx.file_category == 'pdf' %}
+                        {% include "icons/file-text.html" with size="14" class="text-danger-text" %}
+                    {% elif ctx.file_category == 'word' %}
+                        {% include "icons/file-text.html" with size="14" class="text-alquiler-text" %}
+                    {% else %}
+                        {% include "icons/file-text.html" with size="14" class="text-on-surface-variant" %}
+                    {% endif %}
+                </div>
+
+                <p class="text-[12px] font-medium text-on-surface truncate flex-1 min-w-0">
+                    {{ doc.original_filename }}
+                </p>
+
+                {% include "icons/download.html" with size="13" class="shrink-0 text-on-surface-variant" %}
+            </a>
+            {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# ── Comprobantes ─────────────────────────────────────────── #}
+    {% if recent_billing %}
+    <div class="bg-surface border border-outline rounded-lg p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Comprobantes
+        </p>
+        <div class="flex flex-col gap-1.5">
+            {% for doc in recent_billing %}
+            <div class="flex items-center justify-between gap-2 py-2 px-2.5 rounded-md
+                        bg-surface-container-low border border-outline
+                        {% if doc.status == 'cancelled' %}opacity-50{% endif %}">
+                <div class="min-w-0">
+                    <p class="text-[12px] font-medium text-on-surface truncate">
+                        {{ doc.get_document_type_display }}
+                        {% if doc.status == 'cancelled' %}
+                        <span class="text-danger-text text-[11px]">(Cancelado)</span>
+                        {% endif %}
+                    </p>
+                    <p class="text-[11px] text-on-surface-variant tabular-nums">
+                        #{{ doc.number }} · {{ doc.date|date:"d/m/Y" }}
+                    </p>
+                </div>
+                <p class="text-[13px] font-semibold text-on-surface tabular-nums shrink-0">
+                    ${{ doc.total_amount|floatformat:0 }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>

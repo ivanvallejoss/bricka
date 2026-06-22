@@ -97,3 +97,11 @@ def get_recent_documents_for_contract(contract_id: UUID, limit: int = 4) -> Quer
 
 def get_billing_document_count_for_contract(contract_id: UUID) -> int:
     return BillingDocument.objects.filter(contract_id=contract_id).count()
+
+
+def get_recent_documents_for_contact(contact_id: UUID, limit: int = 5) -> QuerySet:
+    return (
+        BillingDocument.objects
+        .filter(recipient_contact_id=contact_id)
+        .order_by("-date", "-number")[:limit]
+    )

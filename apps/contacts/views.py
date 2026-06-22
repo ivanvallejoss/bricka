@@ -13,6 +13,8 @@ from .selectors import ContactFilters, get_contact_detail, get_contact_history, 
 from .services import archive_contact, create_contact, restore_contact, update_contact
 from .selectors import get_search_preferences_for_contact
 
+from apps.billing.selectors import get_recent_documents_for_contact
+
 from apps.contracts.selectors import get_contract_list, ContractFilters
 
 from apps.common.storage import generate_document_url
@@ -83,12 +85,15 @@ def contact_detail(request, contact_id):
 
     search_preferences = get_search_preferences_for_contact(contact_id=contact_id)
 
+    recent_billing = list(get_recent_documents_for_contact(contact_id))
+
     context = {
         "contact": contact,
         "owned_properties": owned_properties,
         "tenant_contracts": tenant_contracts,
         "documents": documents,
-        "search_preferences": search_preferences
+        "search_preferences": search_preferences,
+        "recent_billing": recent_billing,
     }
     if request.htmx:
         return render(request, "contacts/partials/contact_detail_panel.html", context)
