@@ -8,7 +8,9 @@ class ContractDateConflict(ContractValidationError):
     Las fechas del contrato solapan con otro contrato ACTIVE o SCHEDULED
     sobre la misma propiedad.
     """
-    pass
+    def __init__(self, message="", conflicting_contract=None):
+        self.conflicting_contract = conflicting_contract
+        super().__init__(message)
 
 
 class InvalidContractStatus(ContractValidationError):

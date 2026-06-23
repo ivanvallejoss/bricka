@@ -16,33 +16,20 @@ from .models import RentalContract, RentAdjustment
 User = get_user_model()
 
 
-def _check_date_overlap(
-    property_id: UUID,
-    start_date: date,
-    end_date: date,
-    exclude_contract_id=None,
-) -> None:
-    """
-    Verifica que no haya contratos ACTIVE o SCHEDULED con fechas solapadas
-    sobre la misma propiedad.
-
-    Condición de solapamiento estándar:
-    existing.start_date <= new.end_date AND existing.end_date >= new.start_date
-
-    Los contratos soft-deleted, EXPIRED y TERMINATED no bloquean nuevos contratos.
-    Raises ContractDateConflict si hay conflicto.
-    """
+def _check_date_overlap(property_id, start_date, end_date, exclude_contract_id=None):
     qs = RentalContract.objects.filter(
         property_id=property_id,
         status__in=[ContractStatus.ACTIVE, ContractStatus.SCHEDULED],
         start_date__lte=end_date,
         end_date__gte=start_date,
-    )
+    ).select_related("tenant_contact", "property")
     if exclude_contract_id is not None:
         qs = qs.exclude(pk=exclude_contract_id)
-    if qs.exists():
+    conflicting = qs.first()
+    if conflicting:
         raise ContractDateConflict(
-            "Ya existe un contrato cuya vigencia se superpone con las fechas ingresadas."
+            "Ya existe un contrato cuya vigencia se superpone con las fechas ingresadas.",
+            conflicting_contract=conflicting,
         )
 
 

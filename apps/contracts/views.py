@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from .choices import ContractStatus
-from .exceptions import ContractDateConflict, ContractValidationError
+from .exceptions import ContractDateConflict, ContractValidationError, InvalidContractStatus
 from .forms import RentalContractForm
 from .models import RentalContract
 from .selectors import (
@@ -166,7 +166,12 @@ def contract_create(request):
                     guarantee_detail=d.get("guarantee_detail", ""),
                     actor=request.user,
                 )
-            except (ContractDateConflict, ContractValidationError) as e:
+            except ContractDateConflict as e:
+                return render(request, "contracts/contract_create.html", {
+                    "form": form,
+                    "conflict_contract": e.conflicting_contract,
+                })
+            except ContractValidationError as e:
                 form.add_error(None, str(e))
                 return render(request, "contracts/contract_create.html", {"form": form})
             return redirect(reverse("contracts:detail", kwargs={"contract_id": contract.pk}))
@@ -184,9 +189,10 @@ def contract_terminate(request, contract_id):
             raise Http404
         try:
             terminate_contract(contract=contract, actor=request.user)
-            response = HttpResponse(status=204)
-            response["HX-Redirect"] = reverse("contracts:list")
-            return response
+            return redirect(reverse("contracts:list"))
         except InvalidContractStatus as e:
-            return render(request, "partials/modal_error.html", {"error": str(e)})
+            return render(request, "contracts/contract_detail.html", {
+                "contract": contract,
+                "terminate_error": str(e),
+            })
     return HttpResponseNotAllowed(["POST"])
