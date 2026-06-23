@@ -749,3 +749,68 @@ es una función pura sin queries — no rompe la regla de "cross-app via
 selectors" en su intención. Aun así, si en el futuro la view de properties
 acumula más imports de `documents`, conviene evaluar si la lógica de
 presentación debería consolidarse en un selector o context dedicado.
+
+---
+
+## Formularios con FK — `UUIDField` en lugar de `ModelChoiceField`
+
+Para formularios donde los campos FK referencian modelos con muchos
+registros, se usa `forms.UUIDField` en lugar de `ModelChoiceField`.
+
+```python
+class RentalContractForm(forms.Form):
+    property_id = forms.UUIDField(...)
+    tenant_contact_id = forms.UUIDField(...)
+```
+
+El combobox con búsqueda live llena un `<input type="hidden">` con
+el UUID. El form valida que sea un UUID válido. El service recibe el
+UUID y resuelve la instancia — la validación de existencia ocurre
+a nivel de FK constraint en DB, no en el form.
+
+**Por qué no `ModelChoiceField`:** un `<select>` con 500 contactos
+es inviable en producción. El combobox requiere que el form acepte
+el UUID directamente.
+
+---
+
+## Funciones de contexto en views — `_build_*_context`
+
+Cuando una view necesita construir un diccionario de presentación
+con lógica no trivial (colorización por días, textos condicionales),
+esa lógica vive en una función privada `_build_*_context` en el
+módulo de views, no en el template ni en el selector.
+
+```python
+def _build_adjustment_context(contract, today):
+    days = (contract.next_adjustment_date - today).days
+    if days < 0:
+        return {"style": "danger", "text": f"Vencido hace {abs(days)} días", ...}
+    ...
+```
+
+**Motivo:** los templates no deben contener lógica de negocio.
+Los selectors devuelven datos del modelo, no decisiones de UI.
+Las views son el lugar correcto para resolver "qué mostrar y cómo".
+
+---
+
+## Excepciones enriquecidas — adjuntar instancia conflictiva
+
+Cuando una excepción de negocio puede adjuntar el objeto que causó
+el error, hacerlo en el `__init__` evita queries adicionales en la view:
+
+```python
+class ContractDateConflict(ContractValidationError):
+    def __init__(self, message="", conflicting_contract=None):
+        self.conflicting_contract = conflicting_contract
+        super().__init__(message)
+```
+
+El service hace `select_related` antes del raise para que la instancia
+llegue hidratada. La view extrae `e.conflicting_contract` del except
+y lo pasa directamente al template.
+
+**Aplica cuando:** la excepción tiene contexto útil para el usuario
+final (qué contrato, qué propiedad, qué fecha) que sería costoso
+o tedioso reconstruir en la view.

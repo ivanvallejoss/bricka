@@ -694,3 +694,165 @@ tras algún cambio de HTMX, aplicar el mismo fix de OOB al final.
 convenciones de cada sesión deben agregarse manualmente al cierre.
 Abriendo una nueva ventana de contexto, adjuntar este documento
 actualizado junto al prompt de sesión.
+
+---
+
+## Verticales — sesión 4 (`contracts/`)
+
+### Patrón de lista multi-sección con scroll independiente
+
+Cuando una vertical tiene estados cualitativamente distintos (activo /
+programado / finalizado), la lista se divide en secciones independientes
+en lugar de un único listado con pills de filtro.
+
+Cada sección es un `<div>` con `hx-get`, `hx-trigger` y `hx-swap="innerHTML"`
+propio. El filtro global usa `hx-include` para pasar el query a las tres
+secciones simultáneamente via un evento Alpine:
+
+```javascript
+search() {
+    htmx.trigger(document.getElementById('section-active'),    'refresh');
+    htmx.trigger(document.getElementById('section-scheduled'), 'refresh');
+    htmx.trigger(document.getElementById('section-closed'),    'refresh');
+}
+```
+
+La view detecta `request.GET["section"]` y devuelve el partial correspondiente.
+Sección primaria con `hx-trigger="load"` — las secundarias con `revealed`.
+
+**Cuándo aplicar:** cuando los estados tienen información y acciones
+distintas entre sí, y el usuario necesita verlos todos simultáneamente
+sin cambiar de tab.
+
+---
+
+### Cards con dos tiers en lugar de tabla
+
+Para verticales con más de 4 datos por item (propiedad + inquilino +
+precio + fechas + badge), las cards de dos tiers son más legibles que
+tablas con columnas ocultas en mobile.
+
+```python
+[Input text visible]  →  hx-get="/backoffice/<app>/search/?q=..."
+
+hx-trigger="input changed delay:300ms"
+
+hx-target="#<field>-results"
+[Hidden input: <field>_id]  ← lo que realmente envía el form
+[Dropdown de resultados]  ← partial HTML, no JSON
+```
+
+El estado vive en Alpine: `{ id: '', text: '', open: false }`.
+La condición `:readonly="field.id !== ''"` bloquea el input una vez
+elegido, requiriendo el botón X para limpiar.
+
+**Endpoints dedicados** (`/search/`) son preferibles a reutilizar
+los endpoints de lista — responsabilidad única, partial con formato
+exacto para el dropdown, sin annotations ni prefetch pesados.
+
+**Auto-fill entre campos:** cuando seleccionar un registro puede
+pre-rellenar otro (propiedad → propietario), la lógica vive en
+`selectProperty()` con guarda `if (!this.owner.id)` para no
+sobreescribir campos que el usuario ya completó manualmente.
+
+---
+
+### Alpine sobre contenido cargado por HTMX — issue conocido
+
+`x-on:click` en elementos insertados por HTMX no es garantizado.
+La solución robusta es `onclick` nativo + `window.dispatchEvent` +
+escucha con `@evento.window` en el componente Alpine estático:
+
+```javascript
+// En el partial HTMX (onclick nativo):
+onclick="window.dispatchEvent(new CustomEvent('property-selected', {
+    detail: { id: '...', text: '...' }
+}))"
+
+// En el componente Alpine estático:
+@property-selected.window="selectProperty($event.detail.id, ...)"
+```
+
+El componente Alpine estático siempre tiene control total sobre su
+scope. El partial solo dispara el evento — no necesita scope Alpine.
+
+**Known issue:** el auto-fill de propietario al seleccionar propiedad
+no funciona correctamente en esta versión. Registrado como deuda de
+comportamiento para V1.1.
+
+---
+
+### Acciones destructivas — form nativo sobre HTMX
+
+Las acciones destructivas (rescindir, archivar) deben usar `<form
+method="post">` nativo en lugar de `hx-post`. Motivo: `hx-target`
+duplicado (sidebar incluido dos veces en mobile + desktop) puede
+generar comportamiento inconsistente en HTMX.
+
+```html
+<form method="post" action="{% url 'contracts:terminate' contract.pk %}">
+    {% csrf_token %}
+    <button type="submit">Sí</button>
+</form>
+```
+
+La view devuelve `redirect()` estándar en lugar de `HX-Redirect`.
+Más simple, más predecible, sin dependencia de IDs únicos en el DOM.
+
+---
+
+### Excepciones enriquecidas — adjuntar contexto al raise
+
+Cuando una excepción de negocio puede enriquecerse con el objeto
+que causó el error, adjuntarlo al `__init__` permite que la view
+lo use sin queries adicionales:
+
+```python
+class ContractDateConflict(ContractValidationError):
+    def __init__(self, message="", conflicting_contract=None):
+        self.conflicting_contract = conflicting_contract
+        super().__init__(message)
+```
+
+El service hace `select_related` antes del raise. La view extrae
+`e.conflicting_contract` y lo pasa al template para un modal
+informativo. Sin roundtrip adicional.
+
+---
+
+### Orden de `except` en jerarquías de excepción
+
+**Regla que no se negocia:** la excepción más específica siempre
+va primero. Una clase hija capturada por el `except` de la clase
+padre nunca llega al bloque correcto.
+
+```python
+# CORRECTO — específica primero
+except ContractDateConflict as e:      # hija
+    ...
+except ContractValidationError as e:   # padre
+    ...
+
+# INCORRECTO — la hija nunca se ejecuta
+except ContractValidationError as e:   # padre captura todo
+    ...
+except ContractDateConflict as e:      # inalcanzable
+    ...
+```
+
+---
+
+### `name=` en urls.py — error silencioso de alto impacto
+
+Un `name=` incorrecto en `urls.py` hace que `{% url 'app:name' %}`
+resuelva al path equivocado sin ningún error de template. El bug
+solo se manifiesta en runtime como comportamiento inesperado.
+
+```python
+# Bug: name="detail" en la URL de terminate
+path("<uuid:pk>/terminate/", views.terminate, name="detail")
+# Efecto: todos los {% url 'contracts:detail' %} resuelven a /terminate/
+```
+
+Verificar `name=` al agregar cualquier URL nueva, especialmente
+cuando se copypastea de una línea adyacente.
