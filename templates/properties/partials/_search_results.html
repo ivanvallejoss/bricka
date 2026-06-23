@@ -1,0 +1,29 @@
+{% for prop in results %}
+<button type="button"
+        class="w-full flex items-center gap-3 px-4 py-3 text-left
+               hover:bg-surface-container transition-colors"
+        onclick="window.dispatchEvent(new CustomEvent('property-selected', { detail: { id: '{{ prop.pk }}', text: '{{ prop.title|default:prop.address_line|escapejs }}', ownerContactId: '{{ prop.owner_contact.pk|default:'' }}', ownerContactName: '{{ prop.owner_contact.full_name|default:''|escapejs }}' } }))">
+    <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium text-on-surface truncate">
+            {{ prop.title|default:prop.address_line }}
+        </p>
+        <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+            {{ prop.get_property_type_display }}
+            {% if prop.neighborhood %}· {{ prop.neighborhood }}{% endif %}
+            · {{ prop.city }}
+        </p>
+    </div>
+    <span class="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium
+        {% if prop.status == 'available' %}bg-success-bg text-success-text
+        {% elif prop.status == 'rented' %}bg-alquiler-bg text-alquiler-text
+        {% elif prop.status == 'sold' %}bg-venta-bg text-venta-text
+        {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+        {% if prop.status == 'available' %}Disponible
+        {% elif prop.status == 'rented' %}Alquilada
+        {% elif prop.status == 'sold' %}Vendida
+        {% else %}No disponible{% endif %}
+    </span>
+</button>
+{% empty %}
+<p class="px-4 py-3 text-sm text-on-surface-variant">Sin resultados.</p>
+{% endfor %}

@@ -9,7 +9,13 @@ from django.core.paginator import Paginator
 from urllib.parse import urlencode
 
 from .models import Property
-from .selectors import PropertyFilters, get_property_list, get_property_preview, get_property_detail
+from .selectors import (
+    PropertyFilters, 
+    get_property_list, 
+    get_property_preview, 
+    get_property_detail,
+    get_properties_for_search,
+    )
 from .contexts import BadgeContext, PropertyListContext
 
 from apps.billing.selectors import (
@@ -257,4 +263,19 @@ def detail_documents(request, pk):
 
     return render(request, "properties/partials/_detail_documents.html", {
         "documents": contexts,
+    })
+
+
+def property_search(request):
+    """
+    Endpoint de búsqueda para comboboxes. Devuelve partial HTML.
+    Incluye owner_contact para auto-fill en formulario de contratos.
+    """
+    q = request.GET.get("q", "").strip()
+    if not q:
+        return render(request, "properties/partials/_search_results.html", {
+            "results": [],
+        })
+    return render(request, "properties/partials/_search_results.html", {
+        "results": get_properties_for_search(q),
     })

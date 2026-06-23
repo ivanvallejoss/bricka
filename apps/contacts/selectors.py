@@ -69,3 +69,16 @@ def get_search_preferences_for_contact(contact_id: UUID) -> QuerySet:
     Utilizado en el template `contact_detail`
     """
     return SearchPreference.objects.filter(contact_id=contact_id, active=True)
+
+
+def get_contacts_for_search(q: str, limit: int = 8) -> QuerySet:
+    """
+    Búsqueda liviana para comboboxes.
+    """
+    return (
+        Contact.objects
+        .filter(
+            Q(full_name__icontains=q) |
+            Q(phone__icontains=q)
+        )[:limit]
+    )

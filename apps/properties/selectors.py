@@ -129,3 +129,21 @@ def get_properties_for_owner(contact_id: UUID) -> QuerySet:
     Utilizado en el template `contact_detail`
     """
     return Property.objects.filter(owner_contact_id=contact_id)
+
+
+def get_properties_for_search(q: str, limit: int = 8) -> QuerySet:
+    """
+    Búsqueda liviana para comboboxes.
+    Sin annotations ni prefetch pesados.
+    Incluye owner_contact para auto-fill en formulario de contratos.
+    """
+    return (
+        Property.objects
+        .select_related("owner_contact")
+        .filter(
+            Q(title__icontains=q) |
+            Q(address_line__icontains=q) |
+            Q(neighborhood__icontains=q) |
+            Q(city__icontains=q)
+        )[:limit]
+    )

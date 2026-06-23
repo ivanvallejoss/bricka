@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo contrato{% endblock %}
+
+{% block page_title %}
+    <a href="{% url 'contracts:list' %}"
+       class="flex items-center gap-2 text-sm font-medium text-on-surface-variant
+              hover:text-on-surface transition-colors">
+        {% include "icons/arrow-left.html" with size="16" %}
+        Contratos
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl"
+     x-data="{
+         property: { id: '', text: '', open: false },
+         tenant:   { id: '', text: '', open: false },
+         owner:    { id: '', text: '', open: false },
+         showAdjustmentPercent: false,
+
+         selectProperty(id, text, ownerContactId, ownerContactName) {
+             this.property = { id, text, open: false };
+             if (ownerContactId && !this.owner.id) {
+                 this.owner = { id: ownerContactId, text: ownerContactName, open: false };
+             }
+         },
+
+         selectContact(field, id, text) {
+             this[field] = { id, text, open: false };
+         },
+
+         clearField(field) {
+             this[field] = { id: '', text: '', open: false };
+         }
+     }"
+     @property-selected.window="selectProperty($event.detail.id, $event.detail.text, $event.detail.ownerContactId, $event.detail.ownerContactName)"
+     @contact-selected.window="selectContact($event.detail.field, $event.detail.id, $event.detail.text)">
+
+    {# Errores globales (ContractDateConflict, etc.) #}
+    {% if form.non_field_errors %}
+    <div class="mb-4 p-3 rounded-md bg-danger-bg border border-danger-text/20">
+        {% for error in form.non_field_errors %}
+        <p class="text-sm text-danger-text">{{ error }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" class="flex flex-col gap-4">
+        {% csrf_token %}
+
+        {# ── Partes ─────────────────────────────────────────── #}
+        <div class="bg-surface border border-outline rounded-lg">
+            <div class="px-5 py-4 border-b border-outline">
+                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Partes
+                </p>
+            </div>
+            <div class="px-5 py-4 flex flex-col gap-4">
+
+                {# Propiedad #}
+                {% include "contracts/partials/_combobox_property.html" %}
+
+                {# Inquilino #}
+                {% include "contracts/partials/_combobox_contact.html" with field="tenant" label="Inquilino *" form_field=form.tenant_contact_id %}
+
+                {# Propietario #}
+                {% include "contracts/partials/_combobox_contact.html" with field="owner" label="Propietario *" hint="Se completa automáticamente al elegir la propiedad" form_field=form.owner_contact_id %}
+
+            </div>
+        </div>
+
+        {# ── Vigencia ────────────────────────────────────────── #}
+        <div class="bg-surface border border-outline rounded-lg">
+            <div class="px-5 py-4 border-b border-outline">
+                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Vigencia
+                </p>
+            </div>
+            <div class="px-5 py-4 grid grid-cols-2 gap-4">
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Fecha de inicio *
+                    </label>
+                    <input type="date" name="start_date"
+                           value="{{ form.start_date.value|default:'' }}"
+                           class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors
+                                  {% if form.start_date.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% if form.start_date.errors %}
+                    <p class="text-xs text-danger-text">{{ form.start_date.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Fecha de fin *
+                    </label>
+                    <input type="date" name="end_date"
+                           value="{{ form.end_date.value|default:'' }}"
+                           class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors
+                                  {% if form.end_date.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% if form.end_date.errors %}
+                    <p class="text-xs text-danger-text">{{ form.end_date.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        {# ── Precio y pago ───────────────────────────────────── #}
+        <div class="bg-surface border border-outline rounded-lg">
+            <div class="px-5 py-4 border-b border-outline">
+                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Precio y pago
+                </p>
+            </div>
+            <div class="px-5 py-4 grid grid-cols-2 gap-4">
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Precio inicial *
+                    </label>
+                    <input type="number" name="initial_price" step="0.01" min="0"
+                           value="{{ form.initial_price.value|default:'' }}"
+                           placeholder="0"
+                           class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors
+                                  {% if form.initial_price.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% if form.initial_price.errors %}
+                    <p class="text-xs text-danger-text">{{ form.initial_price.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Moneda *
+                    </label>
+                    <select name="currency"
+                            class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                   focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                   focus:border-primary-container transition-colors cursor-pointer">
+                        <option value="ARS" {% if form.currency.value == 'ARS' or not form.currency.value %}selected{% endif %}>Pesos (ARS)</option>
+                        <option value="USD" {% if form.currency.value == 'USD' %}selected{% endif %}>Dólares (USD)</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Día de pago * <span class="text-[10px] font-normal normal-case">(1–28)</span>
+                    </label>
+                    <input type="number" name="payment_due_day" min="1" max="28"
+                           value="{{ form.payment_due_day.value|default:'' }}"
+                           placeholder="10"
+                           class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors
+                                  {% if form.payment_due_day.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% if form.payment_due_day.errors %}
+                    <p class="text-xs text-danger-text">{{ form.payment_due_day.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Mora diaria (%)
+                    </label>
+                    <input type="number" name="late_fee_percent_daily" step="0.01" min="0"
+                           value="{{ form.late_fee_percent_daily.value|default:'2.00' }}"
+                           class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors">
+                </div>
+
+            </div>
+        </div>
+
+        {# ── Ajuste ─────────────────────────────────────────── #}
+        <div class="bg-surface border border-outline rounded-lg">
+            <div class="px-5 py-4 border-b border-outline">
+                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Ajuste
+                </p>
+            </div>
+            <div class="px-5 py-4 grid grid-cols-2 gap-4">
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Índice *
+                    </label>
+                    <select name="adjustment_index"
+                            @change="showAdjustmentPercent = $el.value === 'fixed_percent'"
+                            class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                   focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                   focus:border-primary-container transition-colors cursor-pointer">
+                        <option value="ICL" {% if form.adjustment_index.value == 'ICL' or not form.adjustment_index.value %}selected{% endif %}>ICL (BCRA)</option>
+                        <option value="IPC" {% if form.adjustment_index.value == 'IPC' %}selected{% endif %}>IPC (INDEC)</option>
+                        <option value="CVS" {% if form.adjustment_index.value == 'CVS' %}selected{% endif %}>CVS (INDEC)</option>
+                        <option value="fixed_percent" {% if form.adjustment_index.value == 'fixed_percent' %}selected{% endif %}>Porcentaje fijo</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-1.5"
+                     x-show="showAdjustmentPercent"
+                     x-cloak>
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Porcentaje fijo (%) *
+                    </label>
+                    <input type="number" name="adjustment_percent" step="0.01" min="0"
+                           value="{{ form.adjustment_percent.value|default:'' }}"
+                           placeholder="0.00"
+                           class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors
+                                  {% if form.adjustment_percent.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% if form.adjustment_percent.errors %}
+                    <p class="text-xs text-danger-text">{{ form.adjustment_percent.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Frecuencia * <span class="text-[10px] font-normal normal-case">(meses)</span>
+                    </label>
+                    <input type="number" name="adjustment_frequency_months" min="1"
+                           value="{{ form.adjustment_frequency_months.value|default:'' }}"
+                           placeholder="3"
+                           class="w-full px-3 py-2 text-sm bg-surface border rounded
+                                  focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                  focus:border-primary-container transition-colors
+                                  {% if form.adjustment_frequency_months.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% if form.adjustment_frequency_months.errors %}
+                    <p class="text-xs text-danger-text">{{ form.adjustment_frequency_months.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        {# ── Garantía ────────────────────────────────────────── #}
+        <div class="bg-surface border border-outline rounded-lg">
+            <div class="px-5 py-4 border-b border-outline">
+                <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Garantía
+                </p>
+            </div>
+            <div class="px-5 py-4 flex flex-col gap-4">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Tipo *
+                        </label>
+                        <select name="guarantee_type"
+                                class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                       focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                       focus:border-primary-container transition-colors cursor-pointer">
+                            <option value="property_guarantee" {% if form.guarantee_type.value == 'property_guarantee' or not form.guarantee_type.value %}selected{% endif %}>Garantía propietaria</option>
+                            <option value="insurance" {% if form.guarantee_type.value == 'insurance' %}selected{% endif %}>Seguro de caución</option>
+                            <option value="bank_guarantee" {% if form.guarantee_type.value == 'bank_guarantee' %}selected{% endif %}>Aval bancario</option>
+                            <option value="direct_debit" {% if form.guarantee_type.value == 'direct_debit' %}selected{% endif %}>Débito directo</option>
+                            <option value="other" {% if form.guarantee_type.value == 'other' %}selected{% endif %}>Otro</option>
+                        </select>
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                            Depósito
+                        </label>
+                        <input type="number" name="deposit_amount" step="0.01" min="0"
+                               value="{{ form.deposit_amount.value|default:'' }}"
+                               placeholder="0"
+                               class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                      focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                      focus:border-primary-container transition-colors">
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                        Detalle de garantía
+                    </label>
+                    <textarea name="guarantee_detail" rows="2"
+                              placeholder="Nombre del garante, número de expediente, etc."
+                              class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded
+                                     focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                                     focus:border-primary-container transition-colors resize-none">{{ form.guarantee_detail.value|default:'' }}</textarea>
+                </div>
+
+            </div>
+        </div>
+
+        {# ── Acciones ────────────────────────────────────────── #}
+        <div class="flex items-center justify-end gap-3 pb-6">
+            <a href="{% url 'contracts:list' %}"
+               class="px-4 py-2 text-sm font-medium text-on-surface-variant
+                      hover:text-on-surface transition-colors">
+                Cancelar
+            </a>
+            <button type="submit"
+                    class="px-4 py-2 rounded bg-primary-container text-on-primary
+                           text-sm font-medium hover:bg-primary transition-colors">
+                Crear contrato
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}

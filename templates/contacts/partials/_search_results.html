@@ -1,0 +1,25 @@
+{% for contact in results %}
+<button type="button"
+        class="w-full flex items-center gap-3 px-4 py-3 text-left
+               hover:bg-surface-container transition-colors"
+        onclick="window.dispatchEvent(new CustomEvent('contact-selected', { detail: { field: '{{ field }}', id: '{{ contact.pk }}', text: '{{ contact.full_name|escapejs }}' } }))">
+    <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium text-on-surface truncate">
+            {{ contact.full_name }}
+        </p>
+        <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+            {{ contact.phone|default:contact.email|default:"Sin datos de contacto" }}
+        </p>
+    </div>
+    {% if contact.role %}
+    <span class="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium
+        {% if contact.role == 'owner' %}bg-venta-bg text-venta-text
+        {% elif contact.role == 'tenant' %}bg-alquiler-bg text-alquiler-text
+        {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+        {{ contact.get_role_display }}
+    </span>
+    {% endif %}
+</button>
+{% empty %}
+<p class="px-4 py-3 text-sm text-on-surface-variant">Sin resultados.</p>
+{% endfor %}

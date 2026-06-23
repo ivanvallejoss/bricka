@@ -9,7 +9,13 @@ from .choices import ContactRole, ContactSource
 from .exceptions import ContactHasOpenDeals
 from .forms import ContactForm
 from .models import Contact
-from .selectors import ContactFilters, get_contact_detail, get_contact_history, get_contact_list
+from .selectors import (
+    ContactFilters, 
+    get_contact_detail, 
+    get_contact_history, 
+    get_contact_list,
+    get_contacts_for_search,
+    )
 from .services import archive_contact, create_contact, restore_contact, update_contact
 from .selectors import get_search_preferences_for_contact
 
@@ -270,3 +276,22 @@ def contact_restore(request, contact_id):
         "contacts:contact-detail", kwargs={"contact_id": contact_id}
     )
     return response
+
+
+def contact_search(request):
+    """
+    Endpoint de búsqueda para comboboxes. Devuelve partial HTML.
+    El parámetro `field` indica qué campo del formulario se está llenando
+    (tenant / owner) para que el partial genere el método Alpine correcto.
+    """
+    q = request.GET.get("q", "").strip()
+    field = request.GET.get("field", "tenant")
+    if not q:
+        return render(request, "contacts/partials/_search_results.html", {
+            "results": [],
+            "field": field,
+        })
+    return render(request, "contacts/partials/_search_results.html", {
+        "results": get_contacts_for_search(q),
+        "field": field,
+    })
