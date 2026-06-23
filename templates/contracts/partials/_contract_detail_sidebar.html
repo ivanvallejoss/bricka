@@ -1,0 +1,130 @@
+{% comment %}
+Sidebar de detalle de contrato.
+Incluido dos veces en contract_detail.html:
+  - mobile: inline después del hero (lg:hidden)
+  - desktop: sticky en segunda columna (hidden lg:block)
+Contexto requerido: contract, payment_status
+{% endcomment %}
+<div class="flex flex-col gap-4">
+
+    {# Estado de pago + precio actual #}
+    <div class="bg-surface border border-outline rounded-lg overflow-hidden">
+        <div class="px-4 py-4
+            {% if payment_status == 'paid' %}bg-success-bg
+            {% elif payment_status == 'overdue' %}bg-danger-bg
+            {% elif payment_status == 'pending' %}bg-warning-bg
+            {% else %}bg-surface-container-low{% endif %}">
+
+            <p class="text-[11px] font-medium uppercase tracking-[0.07em]
+                {% if payment_status == 'paid' %}text-success-text
+                {% elif payment_status == 'overdue' %}text-danger-text
+                {% elif payment_status == 'pending' %}text-warning-text
+                {% else %}text-on-surface-variant{% endif %}">
+                {% if payment_status == 'paid' %}Pago este mes
+                {% elif payment_status == 'overdue' %}En mora
+                {% elif payment_status == 'pending' %}Pendiente de pago
+                {% else %}{{ contract.get_status_display }}{% endif %}
+            </p>
+
+            <p class="text-[22px] font-semibold mt-1 tabular-nums text-on-surface">
+                ${{ contract.current_price|floatformat:0 }}
+            </p>
+            <p class="text-[12px] text-on-surface-variant mt-0.5">
+                {{ contract.currency }}
+                {% if payment_status != 'not_applicable' %}
+                · vence el {{ contract.payment_due_day }}
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    {# Acciones #}
+    <div class="bg-surface border border-outline rounded-lg p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Acciones
+        </p>
+        <div class="flex flex-col gap-2">
+
+            <button type="button"
+                    disabled
+                    title="Disponible cuando se implemente billing"
+                    class="w-full inline-flex items-center justify-center gap-2 px-3 py-2
+                           rounded bg-primary-container text-on-primary text-sm font-medium
+                           opacity-40 cursor-not-allowed">
+                {% include "icons/receipt.html" with size="14" %}
+                Emitir recibo
+            </button>
+
+            {% if contract.status == 'active' or contract.status == 'scheduled' %}
+            <div x-data="{ confirming: false }">
+                <button x-show="!confirming"
+                        type="button"
+                        @click="confirming = true"
+                        class="w-full px-3 py-2 rounded border border-danger-text/30
+                               text-sm font-medium text-danger-text
+                               hover:bg-danger-bg transition-colors">
+                    Rescindir contrato
+                </button>
+                <div x-show="confirming" x-cloak class="flex items-center gap-2">
+                    <span class="text-sm text-on-surface-variant shrink-0">¿Confirmar?</span>
+                    <button type="button"
+                            @click="confirming = false"
+                            class="flex-1 px-3 py-2 rounded border border-outline text-sm
+                                   font-medium text-on-surface-variant
+                                   hover:bg-surface-container transition-colors">
+                        No
+                    </button>
+                    <button type="button"
+                            class="flex-1 px-3 py-2 rounded bg-danger-bg
+                                   border border-danger-text/30 text-sm font-medium
+                                   text-danger-text hover:bg-danger-text hover:text-white
+                                   transition-colors">
+                        Sí
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    {# Metadata #}
+    <div class="bg-surface border border-outline rounded-lg p-4">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Detalles
+        </p>
+        <div class="flex flex-col gap-2.5">
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant">Estado</p>
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-medium
+                    {% if contract.status == 'active' %}bg-alquiler-bg text-alquiler-text
+                    {% elif contract.status == 'scheduled' %}bg-surface-container text-on-surface-variant
+                    {% elif contract.status == 'terminated' %}bg-danger-bg text-danger-text
+                    {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+                    {{ contract.get_status_display }}
+                </span>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant">Creado</p>
+                <p class="text-[12px] font-medium text-on-surface tabular-nums">
+                    {{ contract.created_at|date:"d/m/Y" }}
+                </p>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant">Modificado</p>
+                <p class="text-[12px] font-medium text-on-surface tabular-nums">
+                    {{ contract.updated_at|date:"d/m/Y" }}
+                </p>
+            </div>
+            {% if contract.deal %}
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[11px] text-on-surface-variant">Negociación</p>
+                <p class="text-[12px] font-medium text-on-surface font-mono">
+                    #{{ contract.deal.pk|slice:":8" }}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>

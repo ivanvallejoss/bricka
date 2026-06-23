@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Contratos{% endblock %}
+
+{% block page_title %}
+    <h1 class="text-[20px] font-semibold tracking-tight text-on-surface">Contratos</h1>
+{% endblock %}
+
+{% block page_actions %}
+    <a href="#"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded bg-primary-container
+              text-on-primary text-sm font-medium transition-colors hover:bg-primary">
+        {% include "icons/plus.html" with size="15" %}
+        Nuevo contrato
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6"
+     x-data="{
+         search() {
+             htmx.trigger(document.getElementById('section-active'),    'refresh');
+             htmx.trigger(document.getElementById('section-scheduled'), 'refresh');
+             htmx.trigger(document.getElementById('section-closed'),    'refresh');
+         }
+     }">
+
+    {# ── Buscador global ───────────────────────────────────────── #}
+    <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none
+                    text-on-surface-variant">
+            {% include "icons/search.html" with size="15" %}
+        </div>
+        <input
+            type="text"
+            id="contract-search"
+            name="q"
+            @input.debounce.400ms="search()"
+            placeholder="Buscar por propiedad o inquilino..."
+            autocomplete="off"
+            class="w-full pl-9 pr-4 py-2 text-sm bg-surface border border-outline rounded
+                   focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                   focus:border-primary-container placeholder:text-on-surface-variant
+                   transition-colors">
+    </div>
+
+    {# ── Activos ───────────────────────────────────────────────── #}
+    <section class="flex flex-col gap-3">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-on-surface-variant">
+            Activos
+        </p>
+        <div id="section-active"
+             hx-get="{% url 'contracts:list' %}?section=active"
+             hx-trigger="load, refresh"
+             hx-include="#contract-search"
+             hx-swap="innerHTML"
+             class="flex flex-col gap-2">
+            {% include "properties/partials/_slide_over_loading.html" with label="contratos activos" %}
+        </div>
+    </section>
+
+    {# ── Programados ───────────────────────────────────────────── #}
+    <section class="flex flex-col gap-3">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-on-surface-variant">
+            Programados
+        </p>
+        <div id="section-scheduled"
+             hx-get="{% url 'contracts:list' %}?section=scheduled"
+             hx-trigger="load, refresh"
+             hx-include="#contract-search"
+             hx-swap="innerHTML"
+             class="flex flex-col gap-2">
+            {% include "properties/partials/_slide_over_loading.html" with label="contratos programados" %}
+        </div>
+    </section>
+
+    {# ── Finalizados ───────────────────────────────────────────── #}
+    <section class="flex flex-col gap-3">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.07em] text-on-surface-variant">
+            Finalizados
+        </p>
+        <div id="section-closed"
+             hx-get="{% url 'contracts:list' %}?section=closed"
+             hx-trigger="load, refresh"
+             hx-include="#contract-search"
+             hx-swap="innerHTML"
+             class="flex flex-col gap-2">
+            {% include "properties/partials/_slide_over_loading.html" with label="contratos finalizados" %}
+        </div>
+    </section>
+
+</div>
+{% endblock %}

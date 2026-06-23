@@ -1,0 +1,60 @@
+{% for contract in contracts %}
+<a href="{% url 'contracts:detail' contract.pk %}"
+   class="block bg-surface border border-outline rounded-md overflow-hidden
+          opacity-60 hover:opacity-80 transition-opacity">
+
+    {# Tier 1 — Propiedad + estado terminal #}
+    <div class="flex items-center justify-between gap-3 px-4 py-3">
+        <div class="min-w-0">
+            <p class="text-[14px] font-semibold text-on-surface truncate">
+                {{ contract.property.title|default:contract.property.address_line }}
+            </p>
+            {% if contract.property.title %}
+            <p class="text-[12px] text-on-surface-variant mt-0.5 truncate">
+                {{ contract.property.address_line }}
+            </p>
+            {% endif %}
+        </div>
+        <span class="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium
+                     bg-surface-container text-on-surface-variant border border-outline">
+            {% if contract.status == 'expired' %}Vencido
+            {% elif contract.status == 'terminated' %}Rescindido
+            {% endif %}
+        </span>
+    </div>
+
+    {# Tier 2 — Inquilino | Precio final | Vigencia #}
+    <div class="flex items-stretch border-t border-outline divide-x divide-outline">
+
+        <div class="flex-1 min-w-0 px-4 py-3">
+            <p class="text-[11px] text-on-surface-variant mb-0.5">Inquilino</p>
+            <p class="text-[13px] font-medium text-on-surface truncate">
+                {{ contract.tenant_contact.full_name }}
+            </p>
+        </div>
+
+        <div class="shrink-0 px-4 py-3">
+            <p class="text-[11px] text-on-surface-variant mb-0.5">Alquiler final</p>
+            <p class="text-[13px] font-semibold text-on-surface tabular-nums">
+                ${{ contract.current_price|floatformat:0 }}
+                <span class="text-[11px] font-normal text-on-surface-variant">
+                    {{ contract.currency }}
+                </span>
+            </p>
+        </div>
+
+        <div class="hidden sm:block shrink-0 px-4 py-3">
+            <p class="text-[11px] text-on-surface-variant mb-0.5">Vigencia</p>
+            <p class="text-[12px] text-on-surface tabular-nums">
+                {{ contract.start_date|date:"m/Y" }} → {{ contract.end_date|date:"m/Y" }}
+            </p>
+        </div>
+
+    </a>
+
+    </div>
+{% empty %}
+<div class="py-10 text-center bg-surface border border-outline rounded-md">
+    <p class="text-sm text-on-surface-variant">Sin contratos finalizados.</p>
+</div>
+{% endfor %}

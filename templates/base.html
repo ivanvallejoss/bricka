@@ -57,7 +57,7 @@
                     Publicaciones
                 </a>
 
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                <a href="{% url 'contracts:list' %}" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
                         {% if app == 'contracts' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
                     {% include "icons/file-text.html" with size="17" %}
                     Contratos
@@ -132,7 +132,7 @@
                 <span class="text-[10px] font-medium">Publicaciones</span>
             </a>
 
-            <a href="#"
+            <a href="{% url 'contracts:list' %}"
                class="flex flex-col items-center justify-center gap-1
                       text-sidebar-inactive hover:text-white transition-colors">
                 {% include "icons/file-text.html" with size="17" %}

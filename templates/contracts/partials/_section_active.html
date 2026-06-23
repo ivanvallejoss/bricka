@@ -1,0 +1,70 @@
+{% for ctx in contracts %}
+<a href="{% url 'contracts:detail' ctx.contract.pk %}"
+   class="block bg-surface border border-outline rounded-md overflow-hidden
+          hover:bg-surface-container-low transition-colors">
+
+    {# Tier 1 — Propiedad + badge de pago #}
+    <div class="flex items-center justify-between gap-3 px-4 py-3">
+        <div class="min-w-0">
+            <p class="text-[14px] font-semibold text-on-surface truncate">
+                {{ ctx.contract.property.title|default:ctx.contract.property.address_line }}
+            </p>
+            {% if ctx.contract.property.title %}
+            <p class="text-[12px] text-on-surface-variant mt-0.5 truncate">
+                {{ ctx.contract.property.address_line }}
+            </p>
+            {% endif %}
+        </div>
+        {% if ctx.payment_badge %}
+        <span class="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium border
+            {% if ctx.payment_badge.style == 'success' %}border-success-text text-success-text
+            {% elif ctx.payment_badge.style == 'warning' %}border-warning-text text-warning-text
+            {% elif ctx.payment_badge.style == 'danger' %}border-danger-text text-danger-text
+            {% endif %}">
+            {{ ctx.payment_badge.text }}
+        </span>
+        {% endif %}
+    </div>
+
+    {# Tier 2 — Inquilino | Precio | Vigencia | Próx. ajuste #}
+    <div class="flex items-stretch border-t border-outline divide-x divide-outline">
+
+        <div class="flex-1 min-w-0 px-4 py-3">
+            <p class="text-[11px] text-on-surface-variant mb-0.5">Inquilino</p>
+            <p class="text-[13px] font-medium text-on-surface truncate">
+                {{ ctx.contract.tenant_contact.full_name }}
+            </p>
+        </div>
+
+        <div class="shrink-0 px-4 py-3">
+            <p class="text-[11px] text-on-surface-variant mb-0.5">Alquiler</p>
+            <p class="text-[13px] font-semibold text-on-surface tabular-nums">
+                ${{ ctx.contract.current_price|floatformat:0 }}
+                <span class="text-[11px] font-normal text-on-surface-variant">
+                    {{ ctx.contract.currency }}
+                </span>
+            </p>
+        </div>
+
+        <div class="hidden sm:block shrink-0 px-4 py-3">
+            <p class="text-[11px] text-on-surface-variant mb-0.5">Vigencia</p>
+            <p class="text-[12px] text-on-surface tabular-nums">
+                {{ ctx.contract.start_date|date:"m/Y" }} → {{ ctx.contract.end_date|date:"m/Y" }}
+            </p>
+        </div>
+
+        <div class="hidden md:block shrink-0 px-4 py-3">
+            <p class="text-[11px] text-on-surface-variant mb-0.5">Próx. ajuste</p>
+            <p class="text-[12px] text-on-surface tabular-nums">
+                {{ ctx.contract.next_adjustment_date|date:"d/m/Y" }}
+            </p>
+        </div>
+
+    </div>
+
+</a>
+{% empty %}
+<div class="py-10 text-center bg-surface border border-outline rounded-md">
+    <p class="text-sm text-on-surface-variant">Sin contratos activos.</p>
+</div>
+{% endfor %}

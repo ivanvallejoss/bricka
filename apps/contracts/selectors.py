@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 
-from django.db.models import QuerySet, Prefetch
+from django.db.models import Q, QuerySet, Prefetch
 
 from .choices import ContractStatus
 from .models import RentalContract, RentAdjustment
@@ -13,9 +13,11 @@ from .models import RentalContract, RentAdjustment
 class ContractFilters:
     status: str | None = None
     property_id: UUID | None = None
+    statuses: list[str] | None = None
     tenant_contact_id: UUID | None = None
     owner_contact_id: UUID | None = None
     deal_id: UUID | None = None
+    search: str | None = None
 
 
 def get_contract_list(filters: ContractFilters | None = None) -> QuerySet:
@@ -42,6 +44,15 @@ def get_contract_list(filters: ContractFilters | None = None) -> QuerySet:
         qs = qs.filter(owner_contact_id=filters.owner_contact_id)
     if filters.deal_id is not None:
         qs = qs.filter(deal_id=filters.deal_id)
+
+    if filters.statuses is not None:
+        qs = qs.filter(status__in=filters.statuses)
+    if filters.search:
+        qs = qs.filter(
+            Q(property__address_line__icontains=filters.search) |
+            Q(property__title__icontains=fitlers.search) |
+            Q(tenant_contact__full_name__icontains=filters.search)
+        )
 
     return qs
 
