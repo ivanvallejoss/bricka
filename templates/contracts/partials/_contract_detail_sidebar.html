@@ -46,13 +46,14 @@ Contexto requerido: contract, payment_status
         <div class="flex flex-col gap-2">
 
             <button type="button"
-                    disabled
-                    title="Disponible cuando se implemente billing"
+                    hx-get="{% url 'billing:emit-selector' contract.pk %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML"
                     class="w-full inline-flex items-center justify-center gap-2 px-3 py-2
-                           rounded bg-primary-container text-on-primary text-sm font-medium
-                           opacity-40 cursor-not-allowed">
+                        rounded bg-primary-container text-on-primary text-sm font-medium
+                        hover:opacity-90 transition-opacity">
                 {% include "icons/receipt.html" with size="14" %}
-                Emitir recibo
+                Emitir comprobante
             </button>
 
             {% if contract.status == 'active' or contract.status == 'scheduled' %}

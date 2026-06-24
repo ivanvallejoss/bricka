@@ -1,0 +1,192 @@
+{% comment %}
+Step 2 del modal de emisión — formulario de renglones.
+Se inyecta en #emit-modal-content via HTMX swap desde emit_selector.
+No contiene el shell Alpine del modal (backdrop, animación, close).
+Contexto requerido: contract, document_type, document_type_label,
+                    initial_lines_json, mora, current_month, error
+{% endcomment %}
+
+<form
+    hx-post="{% url 'billing:emit-form' contract.pk document_type %}"
+    hx-target="#emit-modal-content"
+    hx-swap="innerHTML"
+    x-data="emitForm({{ initial_lines_json }})"
+    @submit="$el.querySelector('[name=lines_json]').value = linesJson"
+    class="flex flex-col"
+>
+    <input type="hidden" name="lines_json" :value="linesJson">
+
+    {# Subheader con tipo y botón de volver #}
+    <div class="px-5 py-3 border-b border-outline bg-surface-container-low">
+        <div class="flex items-center gap-2">
+            <button
+                type="button"
+                hx-get="{% url 'billing:emit-selector' contract.pk %}"
+                hx-target="#emit-modal-content"
+                hx-swap="innerHTML"
+                class="p-1 rounded text-on-surface-variant
+                       hover:bg-surface-container hover:text-on-surface transition-colors"
+            >
+                {% include "icons/arrow-left.html" with size="14" %}
+            </button>
+            <p class="text-[13px] font-medium text-on-surface">{{ document_type_label }}</p>
+        </div>
+    </div>
+
+    {# Cuerpo con scroll independiente #}
+    <div class="p-5 flex flex-col gap-4 overflow-y-auto max-h-[55vh]">
+
+        {# Error de negocio #}
+        {% if error %}
+        <div class="p-3 rounded-md bg-danger-bg border border-danger-text/20">
+            <p class="text-[13px] text-danger-text">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        {# Flag de mora — solo RENT_RECEIPT con mora activa #}
+        {% if mora %}
+        <div class="flex items-start gap-2.5 p-3 rounded-md
+                    bg-warning-bg border border-warning-text/20">
+            {% include "icons/file-text.html" with size="14" class="shrink-0 mt-0.5 text-warning-text" %}
+            <div>
+                <p class="text-[12px] font-medium text-warning-text">Contrato en mora</p>
+                <p class="text-[11px] text-warning-text/80 mt-0.5">
+                    {{ mora.days_overdue }} día{{ mora.days_overdue|pluralize }}
+                    al {{ mora.daily_rate }}% diario —
+                    monto sugerido incluido en los renglones
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Período #}
+        <div>
+            <label class="block text-[11px] font-medium text-on-surface-variant mb-1.5">
+                Período facturado
+            </label>
+            <input
+                type="month"
+                name="period"
+                value="{{ current_month }}"
+                class="w-full px-3 py-2 rounded-md bg-surface border border-outline
+                       text-sm text-on-surface focus:outline-none focus:border-primary
+                       transition-colors"
+            >
+        </div>
+
+        {# Renglones #}
+        <div>
+            <p class="text-[11px] font-medium text-on-surface-variant mb-2">Renglones</p>
+            <div class="flex flex-col gap-2">
+                <template x-for="(line, index) in lines" :key="line.type">
+                    <div
+                        class="rounded-lg border transition-colors"
+                        :class="line.active
+                            ? 'border-outline bg-surface'
+                            : 'border-outline/40 bg-surface-container-low opacity-50'"
+                    >
+                        {# Fila principal: checkbox + label + amount #}
+                        <div class="flex items-center gap-3 px-3 py-2.5">
+                            <input
+                                type="checkbox"
+                                :id="'line-' + index"
+                                x-model="line.active"
+                                class="w-4 h-4 rounded border-outline accent-primary shrink-0"
+                            >
+                            <label
+                                :for="'line-' + index"
+                                class="flex-1 text-[13px] font-medium text-on-surface
+                                       cursor-pointer select-none"
+                                x-text="line.label"
+                            ></label>
+                            <div x-show="line.active" class="flex items-center gap-1 shrink-0">
+                                <span class="text-[12px] text-on-surface-variant">$</span>
+                                <input
+                                    type="text"
+                                    inputmode="decimal"
+                                    x-model="line.amount"
+                                    @focus="$el.select()"
+                                    class="w-28 px-2 py-1 rounded bg-surface-container
+                                           border border-outline text-[13px] font-medium
+                                           text-on-surface text-right tabular-nums
+                                           focus:outline-none focus:border-primary transition-colors"
+                                >
+                            </div>
+                        </div>
+
+                        {# Descripción — siempre editable cuando activo #}
+                        <div x-show="line.active" class="px-3 pb-2.5">
+                            <input
+                                type="text"
+                                x-model="line.description"
+                                :placeholder="line.requires_description
+                                    ? 'Descripción (obligatorio)'
+                                    : 'Descripción'"
+                                class="w-full px-2 py-1.5 rounded bg-surface-container
+                                       border border-outline text-[12px] text-on-surface
+                                       placeholder:text-on-surface-variant/50
+                                       focus:outline-none focus:border-primary transition-colors"
+                            >
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+    </div>
+
+    {# Footer sticky — total + submit #}
+    <div class="px-5 py-4 border-t border-outline bg-surface-container-low
+                flex items-center justify-between gap-4 shrink-0">
+        <div>
+            <p class="text-[11px] text-on-surface-variant">Total</p>
+            <p class="text-[20px] font-semibold text-on-surface tabular-nums"
+               x-text="'$' + formatTotal()">
+            </p>
+        </div>
+        <button
+            type="submit"
+            class="px-4 py-2 rounded-md bg-primary-container text-on-primary
+                   text-sm font-medium hover:opacity-90 transition-opacity shrink-0"
+        >
+            Emitir comprobante
+        </button>
+    </div>
+
+</form>
+
+<script>
+function emitForm(initialLines) {
+    return {
+        lines: initialLines,
+
+        get total() {
+            return this.lines
+                .filter(l => l.active)
+                .reduce((sum, l) => {
+                    const amount = parseFloat(l.amount) || 0;
+                    return sum + amount * l.sign;
+                }, 0);
+        },
+
+        get linesJson() {
+            return JSON.stringify(
+                this.lines
+                    .filter(l => l.active)
+                    .map(l => ({
+                        type: l.type,
+                        description: l.description,
+                        amount: parseFloat(l.amount) || 0,
+                    }))
+            );
+        },
+
+        formatTotal() {
+            return new Intl.NumberFormat('es-AR', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            }).format(Math.abs(this.total));
+        },
+    };
+}
+</script>

@@ -1,0 +1,105 @@
+{% comment %}
+Modal de emisión de comprobante — step 1: selector de tipo.
+Se carga en #modal-container via HTMX desde contract_detail.
+Shell Alpine: controla backdrop, animación y limpieza del container.
+#emit-modal-content: target del swap HTMX para step 2 (formulario).
+Contexto requerido: contract, options
+{% endcomment %}
+
+<div
+    x-data="{ open: false }"
+    x-init="
+        $nextTick(() => open = true);
+        $watch('open', v => {
+            if (!v) setTimeout(() => {
+                document.getElementById('modal-container').innerHTML = ''
+            }, 200)
+        })
+    "
+    x-cloak
+    @keydown.escape.window="open = false"
+>
+
+    {# Backdrop #}
+    <div
+        x-show="open"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="open = false"
+        class="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs"
+    ></div>
+
+    {# Contenedor centrado #}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+
+        {# Panel #}
+        <div
+            x-show="open"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 translate-y-2"
+            class="pointer-events-auto w-full max-w-md bg-surface border border-outline
+                   rounded-xl shadow-xl overflow-hidden"
+        >
+
+            {# Header — persistente entre steps #}
+            <div class="flex items-start justify-between gap-3 px-5 py-4 border-b border-outline">
+                <div class="min-w-0">
+                    <p class="text-[15px] font-semibold text-on-surface">Emitir comprobante</p>
+                    <p class="text-[12px] text-on-surface-variant truncate mt-0.5">
+                        {{ contract.property.title|default:contract.property.address_line }}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    @click="open = false"
+                    class="shrink-0 p-1 rounded text-on-surface-variant
+                           hover:bg-surface-container hover:text-on-surface transition-colors"
+                >
+                    {% include "icons/x.html" with size="16" %}
+                </button>
+            </div>
+
+            {# Contenido — target del swap HTMX en step 2 #}
+            <div id="emit-modal-content">
+
+                {# Step 1 — selector de tipo #}
+                <div class="p-4 flex flex-col gap-2">
+                    {% for option in options %}
+                    <button
+                        type="button"
+                        hx-get="{% url 'billing:emit-form' contract.pk option.type %}"
+                        hx-target="#emit-modal-content"
+                        hx-swap="innerHTML"
+                        class="w-full flex items-center gap-4 px-4 py-3 rounded-lg
+                               border border-outline bg-surface text-left
+                               hover:bg-surface-container transition-colors group"
+                    >
+                        <div class="w-8 h-8 rounded-md bg-surface-container
+                                    flex items-center justify-center shrink-0">
+                            {% include option.icon with size="16" class="text-on-surface-variant" %}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[13px] font-medium text-on-surface">
+                                {{ option.label }}
+                            </p>
+                            <p class="text-[11px] text-on-surface-variant mt-0.5">
+                                {{ option.description }}
+                            </p>
+                        </div>
+                        {% include "icons/arrow-right.html" with size="14" class="shrink-0 text-on-surface-variant" %}
+                    </button>
+                    {% endfor %}
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
