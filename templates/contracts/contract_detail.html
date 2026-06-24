@@ -251,8 +251,12 @@
             </div>
             <div class="divide-y divide-outline">
                 {% for doc in recent_billing %}
-                <div class="flex items-center justify-between gap-3 px-5 py-3
-                            {% if doc.status == 'cancelled' %}opacity-50{% endif %}">
+                <div class="flex items-center justify-between gap-3 px-5 py-3 cursor-pointer
+                    hover:bg-surface-container-low transition-colors
+                    {% if doc.status == 'cancelled' %}opacity-50{% endif %}"
+                    hx-get="{% url 'billing:detail' doc.pk %}"
+                    hx-target="#modal-container"
+                    hx-swap="innerHTML">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2">
                             <p class="text-[13px] font-medium text-on-surface">

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Facturación{% endblock %}
+
+{% block page_title %}Facturación{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+
+    {# Filtros globales #}
+    <div x-data="billingFilters()"
+         class="flex flex-col sm:flex-row gap-3">
+        <input
+            type="text"
+            x-model="search"
+            @input.debounce.300ms="refresh()"
+            placeholder="Buscar por destinatario o propiedad…"
+            class="flex-1 px-3 py-2 rounded-md bg-surface border border-outline
+                   text-sm text-on-surface placeholder:text-on-surface-variant/50
+                   focus:outline-none focus:border-primary transition-colors"
+        >
+        <input
+            type="month"
+            x-model="period"
+            @change="refresh()"
+            class="px-3 py-2 rounded-md bg-surface border border-outline
+                   text-sm text-on-surface focus:outline-none focus:border-primary
+                   transition-colors"
+        >
+    </div>
+
+    {# Sección Cobros #}
+    <div>
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em]
+                  text-on-surface-variant mb-3">
+            Cobros
+        </p>
+        <div id="section-cobros"
+             hx-get="{% url 'billing:list' %}?section=cobros"
+             hx-trigger="load, refresh-cobros from:body"
+             hx-swap="innerHTML">
+            <div class="flex justify-center py-8">
+                {% include "icons/search.html" with size="16" class="text-on-surface-variant animate-spin" %}
+            </div>
+        </div>
+    </div>
+
+    {# Sección Pagos #}
+    <div>
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em]
+                  text-on-surface-variant mb-3">
+            Pagos
+        </p>
+        <div id="section-pagos"
+             hx-get="{% url 'billing:list' %}?section=pagos"
+             hx-trigger="load, refresh-pagos from:body"
+             hx-swap="innerHTML">
+            <div class="flex justify-center py-8">
+                {% include "icons/search.html" with size="16" class="text-on-surface-variant animate-spin" %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function billingFilters() {
+    return {
+        search: '',
+        period: '',
+
+        refresh() {
+            const params = new URLSearchParams();
+            if (this.search) params.set('q', this.search);
+            if (this.period) params.set('period', this.period);
+            const qs = params.toString();
+
+            htmx.ajax('GET',
+                `{% url 'billing:list' %}?section=cobros&${qs}`,
+                { target: '#section-cobros', swap: 'innerHTML' }
+            );
+            htmx.ajax('GET',
+                `{% url 'billing:list' %}?section=pagos&${qs}`,
+                { target: '#section-pagos', swap: 'innerHTML' }
+            );
+        }
+    }
+}
+</script>
+{% endblock %}

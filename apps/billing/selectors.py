@@ -4,6 +4,8 @@ from datetime import date
 from uuid import UUID
 
 from django.db.models import QuerySet
+from django.core.paginator import Paginator
+from django.db.models import Q
 
 from apps.contracts.choices import ContractStatus
 
@@ -15,6 +17,58 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from apps.contracts.models import RentalContract # Import solo a modo de type hint
 
+# Deuda técnica conocida: COMMISSION_RECEIPT excluido de _COBROS_TYPES
+# hasta que la vertical deals/ tenga URLs activas y un punto de entrada
+# para emisión. Agregar DocumentType.COMMISSION_RECEIPT a este set
+# cuando deals/ esté implementado.
+_COBROS_TYPES = {
+    DocumentType.RENT_RECEIPT,
+    DocumentType.EXPENSE_RECEIPT,
+}
+
+
+def get_cobros(
+    *,
+    search: str | None = None,
+    period: date | None = None,
+    page: int = 1,
+    page_size: int = 20,
+):
+    qs = (
+        BillingDocument.objects
+        .filter(document_type__in=_COBROS_TYPES)
+        .select_related("contract", "contract__property")
+        .order_by("-date", "-number")
+    )
+    if period:
+        qs = qs.filter(period__year=period.year, period__month=period.month)
+    if search:
+        qs = qs.filter(
+            Q(recipient_name__icontains=search) |
+            Q(contract__property__address_line__icontains=search) |
+            Q(contract__property__title__icontains=search)
+        )
+    return Paginator(qs, page_size).page(page)
+
+
+def get_pagos(
+    *,
+    search: str | None = None,
+    period: date | None = None,
+    page: int = 1,
+    page_size: int = 20,
+):
+    qs = (
+        BillingDocument.objects
+        .filter(document_type=DocumentType.OWNER_STATEMENT)
+        .order_by("-date", "-number")
+    )
+    if period:
+        qs = qs.filter(period__year=period.year, period__month=period.month)
+    if search:
+        qs = qs.filter(recipient_name__icontains=search)
+    return Paginator(qs, page_size).page(page)
+    
 
 def _period_start(as_of: date) -> date:
     """Normaliza cualquier fecha al primer día de su mes.
@@ -95,8 +149,10 @@ def get_recent_documents_for_contract(contract_id: UUID, limit: int = 4) -> Quer
         .order_by("-date", "-number")[:limit]
     )
 
+
 def get_billing_document_count_for_contract(contract_id: UUID) -> int:
     return BillingDocument.objects.filter(contract_id=contract_id).count()
+
 
 
 def get_recent_documents_for_contact(contact_id: UUID, limit: int = 5) -> QuerySet:
@@ -104,4 +160,17 @@ def get_recent_documents_for_contact(contact_id: UUID, limit: int = 5) -> QueryS
         BillingDocument.objects
         .filter(recipient_contact_id=contact_id)
         .order_by("-date", "-number")[:limit]
+    )
+
+
+def get_billing_document(document_id: UUID) -> BillingDocument:
+    return (
+        BillingDocument.objects
+        .select_related(
+            "contract",
+            "contract__property",
+            "recipient_contact",
+            "created_by",
+        )
+        .get(pk=document_id)
     )

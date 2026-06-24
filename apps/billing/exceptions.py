@@ -53,3 +53,8 @@ class DuplicatePeriodicReceipt(BillingBusinessError):
     """Ya existe un comprobante issued para ese (contract, document_type,
     period). Aplica a los tipos periódicos: RENT_RECEIPT, EXPENSE_RECEIPT.
     Para reemitir, cancelar primero el existente."""
+
+class CannotCancelDocument(BillingBusinessError):
+    """El comprobante no puede cancelarse porque su estado actual
+    no es ISSUED. Un comprobante ya cancelado no se puede cancelar
+    dos veces."""

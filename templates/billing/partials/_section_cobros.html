@@ -1,0 +1,145 @@
+{% comment %}
+Partial de cobros — target de HTMX desde billing_list.
+Contexto requerido: page_obj, search, period_str
+{% endcomment %}
+
+{% if page_obj.object_list %}
+<div class="bg-surface border border-outline rounded-lg overflow-hidden">
+
+    {# Mobile — cards #}
+    <div class="md:hidden divide-y divide-outline">
+        {% for doc in page_obj.object_list %}
+        <div class="px-4 py-3 cursor-pointer hover:bg-surface-container-low transition-colors
+                    {% if doc.status == 'cancelled' %}opacity-50{% endif %}"
+             hx-get="{% url 'billing:detail' doc.pk %}"
+             hx-target="#modal-container"
+             hx-swap="innerHTML">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <p class="text-[13px] font-medium text-on-surface truncate">
+                            {{ doc.recipient_name }}
+                        </p>
+                        {% if doc.status == 'cancelled' %}
+                        <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium
+                                     bg-danger-bg text-danger-text">
+                            Cancelado
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% if doc.contract %}
+                    <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+                        {{ doc.contract.property.title|default:doc.contract.property.address_line }}
+                    </p>
+                    {% endif %}
+                    <p class="text-[11px] text-on-surface-variant tabular-nums mt-0.5">
+                        {{ doc.get_document_type_display }}
+                        {% if doc.period %} · {{ doc.period|date:"m/Y" }}{% endif %}
+                        · {{ doc.date|date:"d/m/Y" }}
+                    </p>
+                </div>
+                <p class="text-[15px] font-semibold text-on-surface tabular-nums shrink-0">
+                    ${{ doc.total_amount|floatformat:0 }}
+                </p>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <div hx-get="{% url 'billing:list' %}?section=cobros&page={{ page_obj.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if period_str %}&period={{ period_str }}{% endif %}"
+             hx-trigger="revealed"
+             hx-target="closest .divide-y"
+             hx-swap="beforeend"
+             class="px-4 py-4 text-center">
+            <p class="text-[12px] text-on-surface-variant">Cargando…</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Desktop — tabla #}
+    <table class="hidden md:table w-full table-fixed">
+        <colgroup>
+            <col class="w-28">
+            <col>
+            <col class="w-28">
+            <col class="w-24">
+            <col class="w-24">
+        </colgroup>
+        <thead>
+            <tr class="border-b border-outline">
+                <th class="px-4 py-3 text-left text-[11px] font-medium text-on-surface-variant">Número</th>
+                <th class="px-4 py-3 text-left text-[11px] font-medium text-on-surface-variant">Destinatario</th>
+                <th class="px-4 py-3 text-left text-[11px] font-medium text-on-surface-variant">Período</th>
+                <th class="px-4 py-3 text-left text-[11px] font-medium text-on-surface-variant">Fecha</th>
+                <th class="px-4 py-3 text-right text-[11px] font-medium text-on-surface-variant">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in page_obj.object_list %}
+            <tr class="border-b border-outline last:border-0 cursor-pointer
+                       hover:bg-surface-container-low transition-colors
+                       {% if doc.status == 'cancelled' %}opacity-50{% endif %}"
+                hx-get="{% url 'billing:detail' doc.pk %}"
+                hx-target="#modal-container"
+                hx-swap="innerHTML">
+                <td class="px-4 py-3">
+                    <p class="text-[12px] font-mono text-on-surface-variant tabular-nums">#{{ doc.number }}</p>
+                    <p class="text-[11px] text-on-surface-variant mt-0.5">{{ doc.get_document_type_display }}</p>
+                </td>
+                <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                        <p class="text-[13px] font-medium text-on-surface truncate">{{ doc.recipient_name }}</p>
+                        {% if doc.status == 'cancelled' %}
+                        <span class="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium
+                                     bg-danger-bg text-danger-text">Cancelado</span>
+                        {% endif %}
+                    </div>
+                    {% if doc.contract %}
+                    <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+                        {{ doc.contract.property.title|default:doc.contract.property.address_line }}
+                    </p>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    {% if doc.period %}
+                    <p class="text-[12px] text-on-surface tabular-nums">{{ doc.period|date:"m/Y" }}</p>
+                    {% else %}
+                    <p class="text-[12px] text-on-surface-variant">—</p>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    <p class="text-[12px] text-on-surface tabular-nums">{{ doc.date|date:"d/m/Y" }}</p>
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <p class="text-[13px] font-semibold text-on-surface tabular-nums">
+                        ${{ doc.total_amount|floatformat:0 }}
+                    </p>
+                </td>
+            </tr>
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <tr hx-get="{% url 'billing:list' %}?section=cobros&page={{ page_obj.next_page_number }}{% if search %}&q={{ search }}{% endif %}{% if period_str %}&period={{ period_str }}{% endif %}"
+                hx-trigger="revealed"
+                hx-target="closest tbody"
+                hx-swap="beforeend">
+                <td colspan="5" class="px-4 py-4 text-center">
+                    <p class="text-[12px] text-on-surface-variant">Cargando…</p>
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+</div>
+{% else %}
+<div class="bg-surface border border-outline rounded-lg px-5 py-10 text-center">
+    <p class="text-sm text-on-surface-variant">
+        {% if search or period_str %}
+            Sin resultados para los filtros aplicados.
+        {% else %}
+            No hay cobros emitidos todavía.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

@@ -17,6 +17,7 @@ from .exceptions import (
     MissingRequiredRelation,
     DuplicatePeriodicReceipt,
     UnmappedConceptLineSign,
+    CannotCancelDocument,
 )
 from .models import BillingDocument
 from .numbering import assign_document_number
@@ -308,3 +309,24 @@ def _check_sign_maps_complete() -> None:
 
 
 _check_sign_maps_complete()
+
+
+def cancel_billing_document(
+    *,
+    document: BillingDocument,
+    actor,
+) -> BillingDocument:
+    """Cancela un comprobante emitido. Único cambio de estado permitido
+    post-emisión: ISSUED → CANCELLED.
+
+    Raises:
+        CannotCancelDocument: si el documento no está en estado ISSUED.
+    """
+    if document.status != DocumentStatus.ISSUED:
+        raise CannotCancelDocument(
+            "Solo se pueden cancelar comprobantes en estado emitido."
+        )
+    document.status = DocumentStatus.CANCELLED
+    document.updated_by = actor
+    document.save(update_fields=["status", "updated_by", "updated_at"])
+    return document

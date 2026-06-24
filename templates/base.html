@@ -63,7 +63,7 @@
                     Contratos
                 </a>
 
-                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
+                <a href="{% url 'billing:list' %}" class="flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition-colors duration-150
                         {% if app == 'billing' %}bg-white/12 text-white{% else %}text-sidebar-inactive hover:bg-white/6 hover:text-white{% endif %}">
                     {% include "icons/receipt.html" with size="17" %}
                     Facturación
@@ -119,8 +119,8 @@
             </a>
 
             <a href="{% url 'contacts:contact-list' %}"
-               class="flex flex-col items-center justify-center gap-1 transition-colors
-                      {% if app == 'contacts' in request.path %}text-white{% else %}text-sidebar-inactive hover:text-white{% endif %}">
+            class="flex flex-col items-center justify-center gap-1 transition-colors
+                    {% if app == 'contacts' %}text-white{% else %}text-sidebar-inactive hover:text-white{% endif %}">
                 {% include "icons/users.html" with size="17" %}
                 <span class="text-[10px] font-medium">Contactos</span>
             </a>
@@ -133,13 +133,13 @@
             </a>
 
             <a href="{% url 'contracts:list' %}"
-               class="flex flex-col items-center justify-center gap-1
-                      text-sidebar-inactive hover:text-white transition-colors">
+            class="flex flex-col items-center justify-center gap-1 transition-colors
+                    {% if app == 'contracts' %}text-white{% else %}text-sidebar-inactive hover:text-white{% endif %}">
                 {% include "icons/file-text.html" with size="17" %}
                 <span class="text-[10px] font-medium">Contratos</span>
             </a>
 
-            <a href="#"
+            <a href="{% url 'billing:list' %}"
                class="flex flex-col items-center justify-center gap-1
                       text-sidebar-inactive hover:text-white transition-colors">
                 {% include "icons/receipt.html" with size="17" %}
