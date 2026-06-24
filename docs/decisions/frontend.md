@@ -856,3 +856,125 @@ path("<uuid:pk>/terminate/", views.terminate, name="detail")
 
 Verificar `name=` al agregar cualquier URL nueva, especialmente
 cuando se copypastea de una línea adyacente.
+
+## Verticales — sesión 5 (`billing/`)
+
+### Billing como capacidad transversal
+
+`billing/` no tiene dashboard de estado propio. No detecta pendientes
+para tipos sin señal determinista en el sistema. Los puntos de entrada
+son contextuales por vertical:
+
+- `contract_detail` → RENT_RECEIPT, EXPENSE_RECEIPT, OWNER_STATEMENT
+- `deal_detail`     → COMMISSION_RECEIPT (cuando deals/ esté activo)
+- `contact_detail`  → OWNER_STATEMENT (futuro)
+
+La vista global `/backoffice/billing/` es historial de consulta —
+todos los comprobantes emitidos, sin límite, sin detección de pendientes.
+Organizada por dirección del dinero: Cobros / Pagos.
+
+---
+
+### Two-step modal con target interno
+
+Cuando un modal tiene múltiples pasos, el shell Alpine (backdrop,
+animación, close) vive en el partial inicial y nunca se recarga.
+Solo el contenido interno hace swap via HTMX.
+
+```html
+{# Shell — se carga una vez, no se toca entre steps #}
+
+    {# Backdrop + panel #}
+    
+        {# Step 1 — selector #}
+        {# Step 2 — formulario (swap HTMX, solo este div) #}
+    
+
+```
+
+URLs para el two-step:
+
+```bash
+GET  /backoffice/billing/emit/<contract_id>/                → step 1
+
+GET  /backoffice/billing/emit/<contract_id>/<doc_type>/     → step 2
+
+POST /backoffice/billing/emit/<contract_id>/<doc_type>/     → procesamiento
+```
+
+El botón "volver" en step 2 usa `hx-get` al step 1 con
+`hx-target="#emit-modal-content"` — el shell no se toca.
+
+---
+
+### Builder de renglones Alpine
+
+El formulario de emisión maneja una lista de renglones con Alpine.
+Cada renglón tiene `active`, `sign`, `amount`, `description` y
+`requires_description`. El total se computa en tiempo real:
+
+```javascript
+get total() {
+    return this.lines
+        .filter(l => l.active)
+        .reduce((sum, l) => sum + (parseFloat(l.amount) || 0) * l.sign, 0);
+}
+```
+
+Los renglones activos se serializan a JSON en un `<input type="hidden">`
+antes del submit. El server reconstruye `ConceptLine` desde ese JSON —
+no desde campos individuales del form.
+
+El sign de cada renglón lo define la view según el `document_type`
+(`_RECEIPT_SIGN` vs `_OWNER_STATEMENT_SIGN`). El template no conoce
+la lógica de signos.
+
+---
+
+### Cards mobile + tabla desktop
+
+Las tablas con muchas columnas usan dos layouts según viewport:
+
+```html
+{# Mobile — cards con divide-y #}
+<div class="md:hidden divide-y divide-outline">
+    {% for doc in page_obj.object_list %}
+    <div class="px-4 py-3 ...">
+        {# Una card por item — toda la info relevante #}
+    </div>
+    {% endfor %}
+</div>
+
+{# Desktop — tabla con table-fixed #}
+<table class="hidden md:table w-full table-fixed">
+    ...
+</table>
+```
+
+El sentinel de infinite scroll va dentro del contenedor de cada layout:
+
+- Mobile: `hx-target="closest .divide-y"` + `hx-swap="beforeend"`
+- Desktop: `hx-target="closest tbody"` + `hx-swap="beforeend"`
+
+**Cuándo aplicar:** cuando una tabla tiene más de 3 columnas y alguna
+debe ocultarse en mobile. Evitar `w-0 md:w-XX` en `<col>` con
+`table-fixed` — el comportamiento de colapso no es confiable en todos
+los browsers. Dos layouts explícitos es más predecible.
+
+---
+
+### Deuda técnica conocida al cierre de sesión 5
+
+**`COMMISSION_RECEIPT` excluido de cobros:** `_COBROS_TYPES` en
+`billing/selectors.py` no incluye `COMMISSION_RECEIPT`. Agregar
+`DocumentType.COMMISSION_RECEIPT` al set cuando `deals/` tenga
+URLs activas y punto de entrada para emisión.
+
+**Compartir/descargar comprobante:** botones presentes en
+`_document_detail_modal.html` pero deshabilitados. Requiere:
+generación de PDF server-side y URL pública con token firmado
+fuera de `/backoffice/`. V1.1.
+
+**`app_name` pendiente:** `contracts/`, `listings/` y `deals/`
+no tienen `app_name` declarado en sus `urls.py`. Sin esto el
+active state del sidebar y bottom nav no funciona para esas apps.
