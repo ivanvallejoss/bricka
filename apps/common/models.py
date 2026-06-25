@@ -61,11 +61,6 @@ class SoftDeleteModel(BaseModel):
         Dispara post_save signal → audit_log.
         actor es opcional — None indica acción del sistema.
 
-        ⚠️  DEUDA CONOCIDA: cuando actor=None, updated_by no se limpia.
-        Si el modelo tenía updated_by=user_X de la última edición,
-        el audit log registra ese soft_delete con actor=user_X.
-        Atribución incorrecta para acciones ejecutadas por Celery.
-
         No se activa en Contact (archive siempre es acción humana).
         Se activa en Listing y RentalContract cuando Celery dispara
         archivos automáticos. Corregir antes de implementar esos flujos.
@@ -79,11 +74,6 @@ class SoftDeleteModel(BaseModel):
         """
         Restaura un registro soft-deleted.
         Dispara post_save signal → audit_log.
-
-        ⚠️  DEUDA CONOCIDA: cuando actor=None, updated_by no se limpia.
-        Si el modelo tenía updated_by=user_X de la última edición,
-        el audit log registra ese soft_delete con actor=user_X.
-        Atribución incorrecta para acciones ejecutadas por Celery.
 
         No se activa en Contact (archive siempre es acción humana).
         Se activa en Listing y RentalContract cuando Celery dispara

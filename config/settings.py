@@ -3,6 +3,7 @@ import sentry_sdk
 from pathlib import Path
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
+from django.contrib.messages import constants as message_constants
 
 # environ setup
 env = environ.Env()
@@ -133,6 +134,12 @@ else:
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Django messages — remapea el nivel ERROR al tag `danger`
+# para alinear con los tokens semánticos FRD (danger-bg / danger-text).
+# Evita crear tokens error-* que colisionarían con la familia Material existente.
+MESSAGE_TAGS = {
+    message_constants.ERROR: "danger",
+}
 
 # Internacionalización
 LANGUAGE_CODE = "es-ar"

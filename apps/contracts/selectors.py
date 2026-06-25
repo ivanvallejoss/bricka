@@ -50,7 +50,7 @@ def get_contract_list(filters: ContractFilters | None = None) -> QuerySet:
     if filters.search:
         qs = qs.filter(
             Q(property__address_line__icontains=filters.search) |
-            Q(property__title__icontains=fitlers.search) |
+            Q(property__title__icontains=filters.search) |
             Q(tenant_contact__full_name__icontains=filters.search)
         )
 

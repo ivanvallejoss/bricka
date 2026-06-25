@@ -97,6 +97,26 @@
 
             {# Área de contenido con scroll propio #}
             <main id="main-content" class="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-6 pb-28 md:pb-6">
+                {% if messages %}
+                <div class="flex flex-col gap-2 mb-4">
+                    {% for message in messages %}
+                    <div x-data="{ show: true }" x-show="show" x-transition
+                        class="flex items-start justify-between gap-3 px-4 py-3 rounded-lg border text-sm
+                        {% if message.tags == 'success' %}bg-success-bg border-success-text/20 text-success-text
+                        {% elif message.tags == 'warning' %}bg-warning-bg border-warning-text/20 text-warning-text
+                        {% elif message.tags == 'danger' %}bg-danger-bg border-danger-text/20 text-danger-text
+                        {% elif message.tags == 'info' %}bg-info-bg border-info-text/20 text-info-text
+                        {% else %}bg-surface-container border-outline text-on-surface-variant{% endif %}">
+                        <span class="min-w-0">{{ message }}</span>
+                        <button type="button" @click="show = false"
+                                class="shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+                            {% include "icons/x.html" with size="16" %}
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
                 {% block content %}{% endblock %}
             </main>
             <div id="slide-over-container"></div>

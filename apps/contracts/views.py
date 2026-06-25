@@ -3,6 +3,7 @@ from datetime import date
 from django.http import Http404, HttpResponseNotAllowed
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.contrib import messages
 
 from .choices import ContractStatus
 from .exceptions import ContractDateConflict, ContractValidationError, InvalidContractStatus
@@ -191,8 +192,8 @@ def contract_terminate(request, contract_id):
             terminate_contract(contract=contract, actor=request.user)
             return redirect(reverse("contracts:list"))
         except InvalidContractStatus as e:
-            return render(request, "contracts/contract_detail.html", {
-                "contract": contract,
-                "terminate_error": str(e),
-            })
+            messages.error(request, str(e))
+            return redirect(
+                reverse("contracts:detail", kwargs={"contract_id": contract_id})
+            )
     return HttpResponseNotAllowed(["POST"])
