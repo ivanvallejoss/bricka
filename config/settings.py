@@ -97,38 +97,31 @@ AUTH_USER_MODEL = "users.User"
 LOGIN_URL = "/backoffice/login/"
 LOGIN_REDIRECT_URL = "/backoffice/"
 
-# Storage — Cloudflare R2
-# En dev: filesystem local. En prod: Cloudflare
-# Las variables usan prefijo AWS_* porque boto3/django-storage habla S3 API
-if DEBUG:
-    STORAGES = {
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
-    }
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR / "media"
-    R2_PUBLIC_BASE_URL = env.str("R2_PUBLIC_BASE_URL", default="")
-else:
-    STORAGES = {
-        "default": {
-            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
-    }
-    R2_PUBLIC_BASE_URL = env.str("R2_PUBLIC_BASE_URL")
-    
-    AWS_ACCESS_KEY_ID = env.str("R2_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = env.str("R2_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = env.str("R2_STORAGE_BUCKET_NAME")
-    AWS_S3_ENDPOINT_URL = env.str("R2_ENDPOINT_URL")
-    AWS_S3_CUSTOM_DOMAIN = env.str("R2_CUSTOM_DOMAIN")
-    AWS_S3_FILE_OVERWRITE = False
+# --------------------------------------------------------------------------
+# Storage de Django (framework). NADA de la media de negocio pasa por acá:
+# fotos de propiedades, documentos legales y logo van por common/storage.py
+# (boto3 directo → R2). Este bloque existe solo para staticfiles (CSS/JS).
+# No hay FileField/ImageField en el dominio.
+# --------------------------------------------------------------------------
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+# --------------------------------------------------------------------------
+# Cloudflare R2 — media de negocio (boto3 directo, S3-compatible).
+# Idéntico en dev y prod: misma ruta de código, buckets distintos por entorno.
+# El aislamiento de datos lo da el .env (dev → buckets *-dev; prod → reales).
+# Sin defaults: si falta una variable, debe explotar al arrancar, no degradar
+# a string vacío que produce URLs rotas en runtime.
+# --------------------------------------------------------------------------
+R2_ACCOUNT_ID            = env.str("R2_ACCOUNT_ID")
+R2_ACCESS_KEY_ID         = env.str("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY     = env.str("R2_SECRET_ACCESS_KEY")
+R2_ENDPOINT_URL          = env.str("R2_ENDPOINT_URL")           # https://<account>.r2.cloudflarestorage.com
+R2_PUBLIC_MEDIA_BUCKET   = env.str("R2_PUBLIC_MEDIA_BUCKET")    # bricka-media-dev / bricka-media
+R2_PRIVATE_DOCS_BUCKET   = env.str("R2_PRIVATE_DOCS_BUCKET")    # bricka-documents-dev / bricka-documents
+R2_PUBLIC_MEDIA_BASE_URL = env.str("R2_PUBLIC_MEDIA_BASE_URL")
 
 # Static
 STATIC_URL = "static/"
