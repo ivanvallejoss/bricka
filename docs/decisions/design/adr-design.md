@@ -843,6 +843,140 @@ celery -A config beat -l info    # Terminal 4 (cuando haya tareas periódicas)
 
 ---
 
+## Storage — Cloudflare R2
+
+### R2 — dos buckets por modelo de seguridad opuesto
+
+**Decisión:** dos buckets en Cloudflare R2, con modelos de acceso opuestos:
+
+- **`bricka-media`** (público): fotos de propiedades, logo de agencia. Custom
+  domain de Cloudflare, URL estable sin firma. Sin datos sensibles — son
+  archivos que van a portales públicos de todas formas.
+- **`bricka-documents`** (privado): documentos legales. Nunca público. Solo
+  presigned URLs de corta vida (default 300s).
+
+**Por qué no un único bucket:** el acceso público en R2 es a nivel de bucket
+entero — conectar un custom domain expone todo el bucket. Media de marketing y
+documentos legales tienen modelos de seguridad opuestos y no pueden convivir.
+
+**Costo:** dos buckets no cuestan más que uno. R2 factura por bytes y
+operaciones, sin egress fee.
+
+**⚠️ Pendiente operativo antes de producción:** `R2_PUBLIC_MEDIA_BASE_URL`
+apunta al dominio `r2.dev` en dev/sandbox (rate-limited, no apto para
+producción). Antes de la primera publicación real en ZonaProp: registrar
+dominio en Cloudflare, conectar custom domain al bucket público, cambiar la
+env var. Cero cambios de código.
+
+---
+
+### boto3 directo — sin `django-storages` ni `FileField`
+
+**Decisión:** usar boto3 directamente. No se usa `django-storages`.
+
+**Motivo:** `django-storages` está pensado para un bucket por backend, atado
+a `FileField`. Los modelos de Bricka gestionan `r2_key` como `CharField`
+manualmente — no hay `FileField` en ningún modelo de dominio. boto3 directo
+da control fino sobre dos buckets, presigned URLs y la separación
+público/privado.
+
+**Consecuencia:** `STORAGES["default"]` de Django queda como
+`FileSystemStorage`, usado solo por staticfiles. Las variables `AWS_*` en
+settings fueron eliminadas.
+
+---
+
+### Bucket derivado del modelo, no almacenado por fila
+
+**Decisión:** el bucket al que pertenece un archivo se deduce del tipo de
+modelo, no se persiste en una columna por fila.
+
+- `PropertyMedia` → siempre `bricka-media` (público)
+- `Document` → siempre `bricka-documents` (privado)
+
+**Por qué no un campo `bucket` por fila:** sería un estado que puede
+desincronizarse del modelo real. La elección de bucket está codificada en el
+nombre de la función que llama el service (`upload_public_media` vs
+`upload_private_document`) — es imposible que diverja.
+
+---
+
+### Paridad dev/prod en la ruta de código de R2
+
+**Decisión:** `DEBUG` no activa ningún path alternativo para media de negocio.
+R2 corre con código idéntico en dev y prod.
+
+**Justificación:** mantener `common/storage.py` sin ejercitar en dev dejaría
+la ruta de mayor riesgo (servicio externo) sin cobertura real. Un filesystem
+local en dev enmascara errores de configuración, permisos y naming de keys
+que solo aparecerían en producción.
+
+**El aislamiento de datos lo da el `.env`:** dev apunta a `bricka-media-dev`
+y `bricka-documents-dev`; prod a los buckets reales. Paridad de
+comportamiento, no de datos.
+
+---
+
+### Keys con prefijo legible + UUID no enumerable
+
+**Decisión:**
+
+- Media:      `properties/{property_id}/{uuid4}.{ext}`
+- Documentos: `documents/{document_id}/{uuid4}.{ext}`
+
+**Prefijo:** para findability operativa en la consola de R2 — localizar todos
+los archivos de una propiedad o documento sin query a la DB.
+
+**Leaf con UUID propio:** hace la key no enumerable. El bucket privado de
+documentos está protegido por firma + expiración, pero el UUID agrega defensa
+en profundidad: conocer el `document_id` no es suficiente para adivinar la key.
+
+---
+
+### Funciones delete en storage — lanzan, no tragan
+
+**Decisión:** las funciones `delete_*` de `common/storage.py` propagan
+cualquier excepción de R2; nunca la capturan en silencio.
+
+**Por qué:** habilita el orden "R2 primero, DB después" en los services de
+borrado. Si R2 falla, la excepción se propaga y el service nunca llega a
+tocar la DB. Sin esto, una falla silenciosa dejaría filas en DB apuntando a
+objetos inexistentes en R2.
+
+Ver también [Hard delete en `Document`](#hard-delete-en-document--r2-primero-db-después)
+para la aplicación concreta de este principio en `documents/`.
+
+---
+
+### Asimetría de costo — URL pública vs presigned
+
+**Decisión:** dos funciones con costos radicalmente distintos, usadas en
+contextos distintos:
+
+- `get_public_media_url(r2_key)` → concatenación de string. Costo cero.
+  La llama el handler de portales una vez por foto al armar el payload de
+  publicación.
+- `generate_document_download_url(r2_key, expires_in=300)` → firma S3
+  (operación de CPU + llamada a AWS Signature). Solo corre cuando un usuario
+  abre un documento en el backoffice.
+
+**La asimetría es intencional:** no usar presigned URLs para fotos públicas
+(overhead innecesario + las URLs cambiarían con cada request) y no exponer
+documentos privados con URLs estables.
+
+---
+
+### Token de API de portales — Redis, no DB
+
+**Decisión:** el `access_token` de `client_credentials` de la API de Navent
+(ZonaProp) se cachea en Redis con TTL = expiración del token menos un margen
+de seguridad.
+
+**Por qué Redis y no DB:** el token no necesita persistencia entre reinicios
+del proceso — si expira o se pierde, se refresca con una nueva llamada de
+autenticación. Redis ya está en el stack como broker de Celery. Crear una
+tabla para un valor efímero sería overhead de modelado sin beneficio.
+
 ## Pendientes de diseño
 
 ### Propiedades externas (`is_external`) — presentación pendiente
@@ -864,3 +998,15 @@ fila en `ExternalPropertySource` con `property = self.id`. Lo mantiene
 
 **⚠️ Definir convención de presentación antes de implementar las vistas de
 `properties`.**
+
+### Logo de agencia — pendiente de modelo de configuración
+
+**Estado:** cabo suelto de storage. No bloquea ninguna funcionalidad actual.
+
+El logo de agencia vive en `bricka-media` con su `logo_r2_key`. La convención
+de storage (dónde almacenar esa key, qué modelo la referencia) depende de un
+modelo de configuración de agencia que aún no existe.
+
+**Consecuencia:** por ahora, `logo_r2_key` no tiene FK padre definido.
+Definir el modelo de configuración de agencia antes de implementar cualquier
+UI que muestre o permita cambiar el logo.

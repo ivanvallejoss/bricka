@@ -145,6 +145,36 @@ Parte 1 y el rationale completo en la Parte 2. No se duplica.
   → [estructura-de-urls--backoffice_urlspy-centralizado](adr-design.md)
 - **Setup local híbrido:** solo `db` y `redis` en Docker; Django/Celery en
   venv local. PostgreSQL en puerto 5433. → [setup-híbrido-docker](adr-design.md)
+  
+## Storage — Cloudflare R2
+
+- **Dos buckets:** `bricka-media` (público, custom domain, URL estable) para
+  fotos de propiedades y assets de agencia; `bricka-documents` (privado, solo
+  presigned URLs de corta vida) para documentos legales. No pueden convivir
+  en un bucket. → [ADR](#r2--dos-buckets-por-modelo-de-seguridad-opuesto)
+- **boto3 directo, sin `django-storages` ni `FileField` en modelos de dominio.**
+  Los modelos gestionan `r2_key` como `CharField`. `STORAGES["default"]` queda
+  como `FileSystemStorage`, usado solo por staticfiles.
+  → [ADR](#boto3-directo--sin-django-storages-ni-filefield)
+- **El bucket se deriva del modelo, no se almacena por fila.** `PropertyMedia`
+  → siempre bucket público; `Document` → siempre bucket privado.
+  → [ADR](#bucket-derivado-del-modelo-no-almacenado-por-fila)
+- **Paridad dev/prod:** R2 corre con el mismo código en dev y prod. El
+  aislamiento de datos lo da el `.env`: dev apunta a buckets `*-dev`.
+  → [ADR](#paridad-devprod-en-la-ruta-de-código-de-r2)
+- **Keys:** `properties/{property_id}/{uuid4}.{ext}` para media pública;
+  `documents/{document_id}/{uuid4}.{ext}` para documentos privados.
+  → [ADR](#keys-con-prefijo-legible--uuid-no-enumerable)
+- **Funciones `delete_*` de storage lanzan, nunca tragan el error.** Habilita
+  el orden "R2 primero, DB después" en los services de borrado.
+  → [ADR](#funciones-delete-en-storage--lanzan-no-tragan)
+- **URLs:** `get_public_media_url` → concatenación de string (costo cero);
+  `generate_document_download_url` → presigned URL (default 300s, solo cuando
+  un usuario abre un documento en el backoffice).
+  → [ADR](#asimetría-de-costo--url-pública-vs-presigned)
+- **Token de API de portales (Navent):** `access_token` cacheado en Redis con
+  TTL = expiración del token menos margen. No necesita tabla.
+  → [ADR](#token-de-api-de-portales--redis-no-db)
 
 ## Pendientes de diseño
 
@@ -157,5 +187,10 @@ de implementar.
   Definir convención antes de las vistas de properties.
 
   → [propiedades-externas-is_external--presentación-pendiente](adr-design.md)
+
+- **Logo de agencia: `r2_key` sin modelo de configuración.** La key existe
+  en el bucket público pero el modelo de configuración de agencia que la
+  referencia no existe aún. No bloquea storage.
+  → [ADR](#logo-de-agencia--pendiente-de-modelo-de-configuración)
 
 ---
