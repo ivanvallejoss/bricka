@@ -144,7 +144,11 @@ Contexto requerido: contact, documents, recent_billing
             {% for doc in recent_billing %}
             <div class="flex items-center justify-between gap-2 py-2 px-2.5 rounded-md
                         bg-surface-container-low border border-outline
-                        {% if doc.status == 'cancelled' %}opacity-50{% endif %}">
+                        cursor-pointer hover:bg-surface-container transition-colors
+                        {% if doc.status == 'cancelled' %}opacity-50{% endif %}"
+                 hx-get="{% url 'billing:detail' doc.pk %}"
+                 hx-target="#modal-container"
+                 hx-swap="innerHTML">
                 <div class="min-w-0">
                     <p class="text-[12px] font-medium text-on-surface truncate">
                         {{ doc.get_document_type_display }}
