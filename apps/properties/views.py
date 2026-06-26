@@ -74,7 +74,7 @@ def property_list(request):
             cover_url=build_media_url(prop.cover_media_list[0].r2_key)
             if prop.cover_media_list else None,
             display_price=next(
-                (l.price for l in prop.active_listings if not op_type or l.operation_type == op_type),
+                (l.price for l in prop.price_listings if not op_type or l.operation_type == op_type),
                 None,
             ),
             contextual_badge=prop_badges.get(prop.id),

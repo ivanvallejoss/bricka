@@ -95,3 +95,17 @@ def active_listings_prefetch() -> Prefetch:
         ).order_by("operation_type"),
         to_attr="active_listings",
     )
+
+
+def all_listings_prefetch() -> Prefetch:
+    """
+    Prefetch de TODOS los listings (cualquier status, no borrados) para
+    mostrar precio en el listado sin filtrar por publicado/pausado.
+    """
+    return Prefetch(
+        "listings",
+        queryset=Listing.objects.filter(
+            deleted_at__isnull=True,
+        ).order_by("operation_type"),
+        to_attr="price_listings",
+    )
