@@ -103,10 +103,23 @@ LOGIN_REDIRECT_URL = "/backoffice/"
 # (boto3 directo → R2). Este bloque existe solo para staticfiles (CSS/JS).
 # No hay FileField/ImageField en el dominio.
 # --------------------------------------------------------------------------
-STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-}
+if DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
+    R2_PUBLIC_BASE_URL = env.str("R2_PUBLIC_BASE_URL", default="")
+else:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
 
 # --------------------------------------------------------------------------
 # Cloudflare R2 — media de negocio (boto3 directo, S3-compatible).
