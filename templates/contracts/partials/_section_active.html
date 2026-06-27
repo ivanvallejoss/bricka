@@ -16,10 +16,10 @@
             {% endif %}
         </div>
         {% if ctx.payment_badge %}
-        <span class="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium border
-            {% if ctx.payment_badge.style == 'success' %}border-success-text text-success-text
-            {% elif ctx.payment_badge.style == 'warning' %}border-warning-text text-warning-text
-            {% elif ctx.payment_badge.style == 'danger' %}border-danger-text text-danger-text
+        <span class="shrink-0 px-2.5 py-1 rounded-full text-[12px] font-semibold
+            {% if ctx.payment_badge.style == 'success' %}bg-success-text text-white
+            {% elif ctx.payment_badge.style == 'warning' %}bg-warning-text text-white
+            {% elif ctx.payment_badge.style == 'danger' %}bg-danger-text text-white
             {% endif %}">
             {{ ctx.payment_badge.text }}
         </span>

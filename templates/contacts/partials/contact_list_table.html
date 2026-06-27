@@ -10,7 +10,7 @@ Partial de filas de contactos.
     data-detail-url="{% url 'contacts:contact-detail' contact.pk %}"
     @click="window.location.href = $el.dataset.detailUrl"
     class="group border-b border-outline last:border-0 transition-colors
-           hover:bg-surface-container-lowest cursor-pointer">
+           even:bg-surface-container-low/40 hover:bg-info-text/10 cursor-pointer">
 
     {# ── Avatar ──────────────────────────────────────────────── #}
     <td class="p-0 overflow-hidden">

@@ -14,7 +14,7 @@
         data-slide-url="{% url 'properties:slide_over' property.pk %}"
         data-detail-url="{% url 'properties:detail' property.pk %}"
         class="group border-b border-outline last:border-0 transition-colors
-        hover:bg-surface-container-lowest cursor-pointer"
+                even:bg-surface-container-low/40 hover:bg-info-text/10 cursor-pointer"
         @click="
             window.innerWidth >= 768
                 ? htmx.ajax('GET', $el.dataset.slideUrl, { target: '#slide-over-container', swap: 'innerHTML' })
