@@ -8,6 +8,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 
 from apps.contracts.choices import ContractStatus
+from apps.deals.choices import DealType
 
 from .choices import DocumentStatus, DocumentType, PaymentStatus
 from .models import BillingDocument
@@ -17,10 +18,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from apps.contracts.models import RentalContract # Import solo a modo de type hint
 
-# Deuda técnica conocida: COMMISSION_RECEIPT excluido de _COBROS_TYPES
-# hasta que la vertical deals/ tenga URLs activas y un punto de entrada
-# para emisión. Agregar DocumentType.COMMISSION_RECEIPT a este set
-# cuando deals/ esté implementado.
+# Cobros base: recibos contract-based (siempre con period).
+# COMMISSION_RECEIPT se suma aparte en get_cobros, condicionado a
+# deal_type=SALE. Las comisiones de alquiler quedan fuera hasta que deals/
+# tenga punto de emisión propio — siguen sin superficie de listado
+# (deuda técnica parcial pendiente).
 _COBROS_TYPES = {
     DocumentType.RENT_RECEIPT,
     DocumentType.EXPENSE_RECEIPT,
@@ -36,7 +38,13 @@ def get_cobros(
 ):
     qs = (
         BillingDocument.objects
-        .filter(document_type__in=_COBROS_TYPES)
+        .filter(
+            Q(document_type__in=_COBROS_TYPES)
+            | Q(
+                document_type=DocumentType.COMMISSION_RECEIPT,
+                deal__deal_type=DealType.SALE,
+            )
+        )
         .select_related("contract", "contract__property")
         .order_by("-date", "-number")
     )
