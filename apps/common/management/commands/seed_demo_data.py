@@ -34,9 +34,13 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from dateutil.relativedelta import relativedelta
+
+from django.contrib.gis.geos import Point
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection, transaction
 
 from apps.billing.choices import ConceptLineType, DocumentStatus, DocumentType
 from apps.billing.concept import ConceptLine
@@ -44,7 +48,7 @@ from apps.billing.models import BillingDocument
 from apps.billing.services import create_billing_document
 from apps.common.choices import Currency
 from apps.contacts.choices import ContactRole, ContactSource, ContactType
-from apps.contacts.models import Contact
+from apps.contacts.models import Contact, SearchPreference
 from apps.contacts.services import create_contact
 from apps.contracts.choices import AdjustmentIndex, GuaranteeType
 from apps.contracts.models import RentalContract, RentAdjustment
@@ -62,8 +66,22 @@ from apps.listings.choices import ListingStatus, OperationType, PricePeriod
 from apps.listings.models import Listing, ListingPriceHistory, ListingPublication
 from apps.listings.services import create_listing, update_listing_status
 from apps.properties.choices import PropertyType
-from apps.properties.models import Property, PropertyMedia
+from apps.properties.models import Property, PropertyMedia, ExternalPropertySource
 from apps.properties.services import create_property, upload_property_media
+
+
+_DEMO_MODELS = [
+    BillingDocument, Document, RentAdjustment, RentalContract,
+    DealStageHistory, Deal, ListingPublication, ListingPriceHistory,
+    Listing, PropertyMedia, ExternalPropertySource, Property,
+    SearchPreference, Contact,
+]
+_BILLING_SEQUENCES = (
+    "billing_rent_receipt_seq",
+    "billing_commission_receipt_seq",
+    "billing_expense_receipt_seq",
+    "billing_owner_statement_seq",
+)
 
 
 class Command(BaseCommand):
@@ -113,73 +131,44 @@ class Command(BaseCommand):
 
     def _reset(self, User):
         """
-        Elimina todos los registros creados por el usuario demo.
+        Vacía las tablas de la app y reinicia la numeración de billing.
 
-        Orden: dependencias más profundas primero (inverso al de creación).
-        _raw_delete() bypasea AuditViolationError — uso acotado a este
-        comando de desarrollo.
+        TRUNCATE ... CASCADE no depende de created_by, ni del orden de FK,
+        ni del collector. Cierra los dos modos de fallo del borrado por lista:
+        filas creadas por otros usuarios/sistema sobre data demo, e hijos
+        CASCADE / referrers SET_NULL que _raw_delete no neutralizaba.
+
+        La completitud la garantiza Postgres: CASCADE trunca toda tabla que
+        referencie a las listadas, figure o no en _DEMO_MODELS.
+
+        GUARD: solo con DEBUG=True. Es un borrado TOTAL de esas tablas —
+        nunca contra una base con datos a conservar. Si tu local corre con
+        DEBUG=False, cambiá el guard por un chequeo del nombre de la base.
         """
-        try:
-            demo_user = User.all_objects.get(username="bricka_demo")
-        except User.DoesNotExist:
-            self.stdout.write("  No se encontró usuario demo. Nada que eliminar.")
-            return
+        if not settings.DEBUG:
+            raise CommandError(
+                "Reset deshabilitado fuera de DEBUG: es un TRUNCATE total."
+            )
 
-        # Modelos con AuditableMixin: _raw_delete bypasea AuditViolationError.
-        # Modelos sin AuditableMixin: .delete() normal.
+        tables = ", ".join(model._meta.db_table for model in _DEMO_MODELS)
 
-        BillingDocument.objects.filter(
-            created_by=demo_user
-        )._raw_delete(using="default")
+        with transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute(f"TRUNCATE {tables} RESTART IDENTITY CASCADE;")
 
-        Document.all_objects.filter(
-            created_by=demo_user
-        )._raw_delete(using="default")
+            # Sequences de billing: standalone (creadas por migración, no
+            # owned-by-column) → RESTART IDENTITY no las toca. Reinicio manual
+            # para que el reseed numere desde 1.
+            for sequence in _BILLING_SEQUENCES:
+                cursor.execute(f"ALTER SEQUENCE {sequence} RESTART WITH 1;")
 
-        ListingPriceHistory.objects.filter(created_by=demo_user).delete()
-        ListingPublication.objects.filter(created_by=demo_user).delete()
-        DealStageHistory.objects.filter(created_by=demo_user).delete()
+            # El usuario demo no vive en las tablas truncadas. Se borra
+            # explícito para que _seed pueda recrearlo. _raw_delete porque
+            # User es auditado y .delete() levantaría AuditViolationError.
+            User.all_objects.filter(
+                username="bricka_demo"
+            )._raw_delete(using="default")
 
-        # Deal antes que Listing: Deal.listing es PROTECT, no SET_NULL.
-        # Postgres rechaza borrar un Listing si algún Deal lo referencia.
-        Deal.all_objects.filter(
-            created_by=demo_user
-        )._raw_delete(using="default")
-
-        # Listing después de Deal: ya no hay referencias PROTECT activas.
-        Listing.all_objects.filter(
-            created_by=demo_user
-        )._raw_delete(using="default")
-
-        # RentAdjustment usa applied_by en lugar de created_by.
-        # No se siembran ajustes en V1, incluido por completitud futura.
-        RentAdjustment.objects.filter(applied_by=demo_user).delete()
-
-        RentalContract.all_objects.filter(
-            created_by=demo_user
-        )._raw_delete(using="default")
-
-        PropertyMedia.objects.filter(created_by=demo_user).delete()
-
-        Property.all_objects.filter(
-            created_by=demo_user
-        )._raw_delete(using="default")
-
-        Contact.all_objects.filter(
-            created_by=demo_user
-        )._raw_delete(using="default")
-
-        # demo_user.delete() dispara el collector de Django, que intenta
-        # queryset.update(campo=None) sobre todos los SET_NULL FK que apuntan
-        # al usuario (Property.updated_by, Contact.updated_by, etc.).
-        # AuditedQuerySet.update() lanza AuditViolationError incondicionalmente,
-        # incluso con un queryset vacio -- rompe el delete.
-        # _raw_delete bypasea el collector y su logica de cascada.
-        # Seguro porque todas las filas demo ya fueron borradas arriba
-        # y no quedan FK activos apuntando a este usuario.
-        User.all_objects.filter(pk=demo_user.pk)._raw_delete(using="default")
-
-        self.stdout.write("  Datos demo eliminados.")
+        self.stdout.write("  Tablas vaciadas, numeración de billing reiniciada.")
 
     # ------------------------------------------------------------------ #
     # Seed                                                                 #
