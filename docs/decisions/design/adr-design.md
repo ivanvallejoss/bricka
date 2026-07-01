@@ -1010,3 +1010,55 @@ modelo de configuración de agencia que aún no existe.
 **Consecuencia:** por ahora, `logo_r2_key` no tiene FK padre definido.
 Definir el modelo de configuración de agencia antes de implementar cualquier
 UI que muestre o permita cambiar el logo.
+
+## Coordinación de estado cruzado
+
+### Módulo `operations` — dueño de los efectos cruzados sin dueño
+
+**Decisión:** los efectos que cruzan agregados —`Property.status` →
+`Listing.status` → `ListingPublication`— viven en un módulo de coordinación
+propio, `apps/operations/services.py`, no en el evento de negocio que los
+dispara (`close_deal`, services de contrato) ni en `properties.services`.
+
+**Punto de anclaje:** hay varias puertas que cambian `Property.status`
+(`close_deal`, los cuatro services de contrato, el parámetro `status` de
+`update_property`, el seed). El único punto donde convergen es `Property.status`
+mismo. La cascada se ancla ahí, en `transition_property_status(...)`, y toda
+puerta —presente o futura— la hereda por pasar por el orquestador. Colgarla del
+evento obligaría a duplicarla en cada puerta.
+
+**Por qué módulo aparte y no `properties.services`:** es donde van a vivir
+*todos* los efectos cruzados sin dueño: `property→listing` hoy, `deal→billing`
+(comisión al ganar) y `listing→publication` (integración de canales) después. El
+nombre dice qué hospeda y no tienta a incrustar la comisión dentro de
+`close_deal`.
+
+**Módulo plano, NO en `INSTALLED_APPS`.** `operations` no tiene modelos ni los
+va a tener —es coordinación pura—, así que no es una app Django: es un paquete
+importable. pytest lo descubre por path igual. Registrarlo sería inofensivo pero
+innecesario.
+
+**Reparto de responsabilidades:** la *política* de la cascada (qué estado de
+Property mapea a qué acción sobre listings) vive en `operations`. La *lectura*
+del set a reconciliar sale de `listings/selectors`. La *mutación* pasa por
+`listings/services` (`update_listing_status`), nunca por un bulk `.update()` —
+`AuditedQuerySet` lo bloquea a propósito, así que la reconciliación es un loop
+de llamadas al service, no un write masivo. El write de `Property.status` se
+delega en `properties.services.update_property_status`.
+
+**Cascada asimétrica:** bajar (cerrar/pausar) es automático; subir (republicar
+en un canal externo) es manual —consume un slot finito y una llamada de API—.
+La landing propia, gratis, vuelve sola porque su visibilidad es
+`Listing.status == PUBLISHED`.
+
+**Capa externa pasiva en V1 — "avisar, no actuar".** Sin la API del canal, el
+orquestador no baja publicaciones: solo hace *surface* (logging) de las que
+quedaron vivas tras cerrar/pausar su listing, dejando registro de una baja
+manual pendiente. Cuando entre la integración de canales, `_surface_external_
+publications` es el punto único a reemplazar por la baja automática o por una
+tarea visible en la UI.
+
+**Atomicidad:** `transition_property_status` abre su propio `transaction.atomic()`.
+Cuando el caller ya abrió una (close_deal, contratos), anida como savepoint; sin
+caller previo (withdraw/restore/remandate), el atomic propio garantiza la
+atomicidad.
