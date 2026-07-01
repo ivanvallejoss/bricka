@@ -78,7 +78,6 @@ def update_property(
     youtube_video_url: str | None = None,
     features: list[str] | None = None,
     owner_contact_id: UUID | None = None,
-    status: str | None = None,
     actor: User,
 ) -> Property:
     update_fields = ["updated_by", "updated_at"]
@@ -126,11 +125,7 @@ def update_property(
     if owner_contact_id is not None:
         property.owner_contact_id = owner_contact_id
         update_fields.append("owner_contact_id")
-
-    if status is not None:
-        property.status = status
-        update_fields.append("status")
-
+        
     property.updated_by = actor
     property.save(update_fields=update_fields)
 

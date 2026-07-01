@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from apps.properties.choices import PropertyStatus
-from apps.properties.services import update_property_status
+from apps.operations.services import transition_property_status
 
 from .choices import AdjustmentIndex, ContractStatus
 from .exceptions import ContractDateConflict, ContractValidationError, InvalidContractStatus
@@ -57,8 +57,8 @@ def create_rental_contract(
     Crea un contrato de alquiler.
 
     Status inicial determinado por start_date:
-    - start_date <= today → ACTIVE + property.status = RENTED
-    - start_date > today  → SCHEDULED, sin side effect sobre property
+    - start_date <= today → ACTIVE + property.status = RENTED (vía
+      orquestador: cierra el listing de alquiler; deja el de venta si existe)
 
     Raises ContractValidationError si adjustment_index=FIXED_PERCENT y
     adjustment_percent es None.
@@ -106,9 +106,9 @@ def create_rental_contract(
         contract.save()
 
         if status == ContractStatus.ACTIVE:
-            update_property_status(
+            transition_property_status(
                 property=contract.property,
-                status=PropertyStatus.RENTED,
+                new_status=PropertyStatus.RENTED,
                 actor=actor,
             )
 
@@ -119,8 +119,8 @@ def terminate_contract(*, contract: RentalContract, actor: User) -> RentalContra
     """
     Rescinde un contrato — opera sobre ACTIVE y SCHEDULED.
 
-    Side effect: solo si estaba ACTIVE → property.status = AVAILABLE.
-    Un contrato SCHEDULED nunca activó la propiedad — no hay nada que revertir.
+    Side effect: solo si estaba ACTIVE → property.status = AVAILABLE (vía
+    orquestador: despausa listings pausados; los cerrados quedan quietos).
 
     Raises InvalidContractStatus si el contrato está EXPIRED o TERMINATED.
     """
@@ -137,9 +137,9 @@ def terminate_contract(*, contract: RentalContract, actor: User) -> RentalContra
         contract.save(update_fields=["status", "updated_by", "updated_at"])
 
         if was_active:
-            update_property_status(
+            transition_property_status(
                 property=contract.property,
-                status=PropertyStatus.AVAILABLE,
+                new_status=PropertyStatus.AVAILABLE,
                 actor=actor,
             )
 
@@ -151,7 +151,8 @@ def expire_contract(*, contract: RentalContract, actor: User) -> RentalContract:
     Vence un contrato — solo ACTIVE.
     Diseñado para ser llamado por la tarea Celery periódica (actor puede ser None).
 
-    Side effect: property.status = AVAILABLE.
+    Side effect: property.status = AVAILABLE (vía orquestador: despausa
+    listings pausados; los cerrados quedan quietos).
 
     Raises InvalidContractStatus para cualquier otro estado.
     """
@@ -165,9 +166,9 @@ def expire_contract(*, contract: RentalContract, actor: User) -> RentalContract:
         contract.updated_by = actor
         contract.save(update_fields=["status", "updated_by", "updated_at"])
 
-        update_property_status(
+        transition_property_status(
             property=contract.property,
-            status=PropertyStatus.AVAILABLE,
+            new_status=PropertyStatus.AVAILABLE,
             actor=actor,
         )
 
@@ -179,7 +180,8 @@ def activate_scheduled_contract(*, contract: RentalContract, actor: User) -> Ren
     Activa un contrato SCHEDULED cuando su start_date llega.
     Diseñado para ser llamado por la tarea Celery periódica (actor puede ser None).
 
-    Side effect: property.status = RENTED.
+    Side effect: property.status = RENTED (vía orquestador: cierra el listing
+    de alquiler; deja el de venta si existe).
 
     Raises InvalidContractStatus para cualquier otro estado.
     """
@@ -193,9 +195,9 @@ def activate_scheduled_contract(*, contract: RentalContract, actor: User) -> Ren
         contract.updated_by = actor
         contract.save(update_fields=["status", "updated_by", "updated_at"])
 
-        update_property_status(
+        transition_property_status(
             property=contract.property,
-            status=PropertyStatus.RENTED,
+            new_status=PropertyStatus.RENTED,
             actor=actor,
         )
 

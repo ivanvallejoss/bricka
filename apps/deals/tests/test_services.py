@@ -9,6 +9,7 @@ from apps.deals.models import Deal
 from apps.deals.services import archive_deal, close_deal, create_deal, update_deal
 from apps.deals.tests.factories import DealFactory
 from apps.listings.tests.factories import ListingFactory
+from apps.listings.choices import ListingStatus, OperationType 
 from apps.properties.choices import PropertyStatus
 from apps.properties.tests.factories import PropertyFactory
 
@@ -259,3 +260,66 @@ class TestArchiveDeal:
         deal = DealFactory(created_by=actor, updated_by=actor)
         archive_deal(deal=deal, actor=actor)
         assert Deal.all_objects.filter(pk=deal.pk).exists()
+
+
+@pytest.mark.django_db
+class TestCloseDealListingReconciliation:
+    """
+    Wiring: close_deal enruta por operations.transition_property_status, que
+    reconcilia los listings. Estos tests prueban que el efecto llega en la
+    integración; el detalle de la cascada vive en apps/operations/tests.
+    """
+
+    def test_won_sale_closes_sale_and_pauses_rent(self):
+        actor = UserFactory()
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        deal = DealFactory.create(
+            with_listing=True,
+            listing=sale,
+            deal_type=DealType.SALE,
+            outcome="",
+            created_by=actor,
+            updated_by=actor,
+        )
+        close_deal(deal=deal, outcome=DealOutcome.WON, actor=actor)
+        sale.refresh_from_db()
+        rent.refresh_from_db()
+        assert sale.status == ListingStatus.CLOSED
+        assert rent.status == ListingStatus.PAUSED
+
+    def test_won_rent_closes_rent_and_leaves_sale(self):
+        actor = UserFactory()
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        deal = DealFactory.create(
+            with_listing=True,
+            listing=rent,
+            deal_type=DealType.RENT,
+            outcome="",
+            created_by=actor,
+            updated_by=actor,
+        )
+        close_deal(deal=deal, outcome=DealOutcome.WON, actor=actor)
+        sale.refresh_from_db()
+        rent.refresh_from_db()
+        assert rent.status == ListingStatus.CLOSED
+        assert sale.status == ListingStatus.PUBLISHED

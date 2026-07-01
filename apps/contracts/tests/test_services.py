@@ -21,6 +21,10 @@ from apps.contracts.services import (
     update_contract_end_date,
 )
 from apps.contracts.tests.factories import RentalContractFactory
+
+from apps.listings.choices import ListingStatus, OperationType
+from apps.listings.tests.factories import ListingFactory
+
 from apps.properties.choices import PropertyStatus
 from apps.properties.tests.factories import PropertyFactory
 
@@ -498,3 +502,33 @@ class TestUpdateContractEndDate:
                 new_end_date=date.today() + relativedelta(months=6),
                 actor=actor,
             )
+
+
+@pytest.mark.django_db
+class TestCreateRentalContractListingReconciliation:
+    """
+    Wiring: create_rental_contract (ACTIVE) enruta por el orquestador, que cierra
+    el listing de alquiler y deja el de venta. Detalle de la cascada en
+    apps/operations/tests.
+    """
+
+    def test_active_contract_closes_rent_listing_leaves_sale(self):
+        actor = UserFactory()
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        tenant = ContactFactory()
+        owner = ContactFactory()
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        create_rental_contract(**_base_contract_kwargs(prop, tenant, owner, actor))
+        sale.refresh_from_db()
+        rent.refresh_from_db()
+        assert rent.status == ListingStatus.CLOSED
+        assert sale.status == ListingStatus.PUBLISHED

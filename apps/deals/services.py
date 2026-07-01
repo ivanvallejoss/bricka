@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from apps.common.utils import UNSET
 from apps.properties.choices import PropertyStatus
-from apps.properties.services import update_property_status
+from apps.operations.services import transition_property_status
 
 from .choices import DealOutcome, DealType
 from .exceptions import DealAlreadyClosed, DealValidationError
@@ -95,15 +95,15 @@ def close_deal(
     actor: User,
 ) -> Deal:
     """
-    Cierra un deal con un outcome terminal.
-
-    Los deals cerrados son irreversibles en V1.
-    El frontend debe solicitar confirmación explícita antes de llamar
-    este service — ver convención de modales en docs/decisions/frontend.md.
-
     Side effects cuando outcome=WON y deal.listing_id no es null:
       RENT → Property.status = RENTED
       SALE → Property.status = SOLD
+
+    El cambio de estado pasa por operations.transition_property_status, que
+    además reconcilia los listings de la propiedad (RENT cierra el de alquiler y
+    deja el de venta; SALE cierra el de venta y pausa el de alquiler) y hace
+    surface de las publicaciones externas a dar de baja. Este service no toca
+    listings directamente.
 
     Sin side effect para propiedades ajenas (deal.listing_id is None).
     """
@@ -123,9 +123,9 @@ def close_deal(
                 if deal.deal_type == DealType.RENT
                 else PropertyStatus.SOLD
             )
-            update_property_status(
+            transition_property_status(
                 property=prop,
-                status=new_status,
+                new_status=new_status,
                 actor=actor,
             )
 
