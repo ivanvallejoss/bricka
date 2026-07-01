@@ -22,7 +22,34 @@ class TestTransitionToSold:
         prop.refresh_from_db()
         assert prop.status == PropertyStatus.SOLD
 
-    def test_closes_all_active_listings(self, db, actor):
+    def test_closes_sale_listing(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        transition_property_status(
+            property=prop, new_status=PropertyStatus.SOLD, actor=actor
+        )
+        assert _status(sale) == ListingStatus.CLOSED
+
+    def test_pauses_rent_listing_does_not_close_it(self, db, actor):
+        # regla de negocio: una unidad vendida puede seguir alquilándose si el
+        # nuevo dueño sigue el mandato. El alquiler se pausa, no se cierra.
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        transition_property_status(
+            property=prop, new_status=PropertyStatus.SOLD, actor=actor
+        )
+        assert _status(rent) == ListingStatus.PAUSED
+
+    def test_sale_closes_and_rent_pauses_together(self, db, actor):
+        # el escenario clave: propiedad publicada para venta y alquiler a la vez.
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
         sale = ListingFactory(
             property=prop,
@@ -38,9 +65,21 @@ class TestTransitionToSold:
             property=prop, new_status=PropertyStatus.SOLD, actor=actor
         )
         assert _status(sale) == ListingStatus.CLOSED
-        assert _status(rent) == ListingStatus.CLOSED
+        assert _status(rent) == ListingStatus.PAUSED
 
-    def test_closes_paused_listing_too(self, db, actor):
+    def test_closes_paused_sale_listing(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PAUSED,
+        )
+        transition_property_status(
+            property=prop, new_status=PropertyStatus.SOLD, actor=actor
+        )
+        assert _status(sale) == ListingStatus.CLOSED
+
+    def test_already_paused_rent_stays_paused(self, db, actor):
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
         rent = ListingFactory(
             property=prop,
@@ -50,7 +89,7 @@ class TestTransitionToSold:
         transition_property_status(
             property=prop, new_status=PropertyStatus.SOLD, actor=actor
         )
-        assert _status(rent) == ListingStatus.CLOSED
+        assert _status(rent) == ListingStatus.PAUSED
 
     def test_leaves_draft_listing_untouched(self, db, actor):
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
@@ -183,7 +222,7 @@ class TestExternalPublicationSurface:
             )
         # el listing se cerró...
         listing.refresh_from_db()
-        assert listing.status == ListingStatus.CLOSED
+        assert listing.status == ListingStatus.PAUSED
         # ...pero la publicación externa NO se tocó (avisar, no actuar)
         pub.refresh_from_db()
         assert pub.status == PublicationStatus.PUBLISHED

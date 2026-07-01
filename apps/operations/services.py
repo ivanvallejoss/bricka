@@ -87,9 +87,23 @@ def _reconcile_listings(
     AuditedQuerySet lo bloquea a propósito para no saltear el audit log.
     """
     if new_status == PropertyStatus.SOLD:
-        # La unidad sale del mercado: cerrar todos los listings activos.
-        closed = _close_listings(property_id=property.pk, actor=actor)
-        _surface_external_publications(closed)
+        # La venta se concretó: cerrar los listings de venta (no se puede seguir
+        # vendiendo lo ya vendido). El alquiler NO se cierra: si el nuevo dueño
+        # sigue el mandato, la unidad sigue alquilable — dato de negocio que la
+        # función no conoce y solo sabe el agente. Se pausa (sale de la landing,
+        # retiene el slot) y queda como decisión humana explícita: reactivar
+        # (caso inversor) o cerrar deliberadamente.
+        closed = _close_listings(
+            property_id=property.pk,
+            actor=actor,
+            operation_types=[OperationType.SALE],
+        )
+        paused = _pause_listings(
+            property_id=property.pk,
+            actor=actor,
+            operation_types=_RENT_OPERATION_TYPES,
+        )
+        _surface_external_publications(closed + paused)
 
     elif new_status == PropertyStatus.RENTED:
         # Cerrar solo los de alquiler; el de venta sigue vivo (published).
@@ -135,12 +149,18 @@ def _close_listings(
     return listings
 
 
-def _pause_listings(*, property_id: UUID, actor: User | None) -> list[Listing]:
+def _pause_listings(
+    *,
+    property_id: UUID,
+    actor: User | None,
+    operation_types: list[str] | None = None,
+) -> list[Listing]:
     """Pausa los listings publicados (PUBLISHED → PAUSED). Devuelve los pausados."""
     listings = list(
         get_listings_for_reconciliation(
             property_id,
             statuses=[ListingStatus.PUBLISHED],
+            operation_types=operation_types,
         )
     )
     for listing in listings:

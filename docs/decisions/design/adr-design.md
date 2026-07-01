@@ -1062,3 +1062,5 @@ tarea visible en la UI.
 Cuando el caller ya abrió una (close_deal, contratos), anida como savepoint; sin
 caller previo (withdraw/restore/remandate), el atomic propio garantiza la
 atomicidad.
+
+**El alquiler no se cierra en SOLD — se pausa.** "Vendido = fuera del mercado de alquiler" es una regla de negocio que la función no puede conocer: solo el agente sabe si el comprador es un inversor que sigue el mandato de alquiler. Cerrar el listing de alquiler automáticamente sería automatización de más. SOLD lo pausa (fuera de la landing, retiene el slot) y deja la decisión —reactivar o cerrar— como paso humano explícito. Esto resuelve el gap #7 con matiz: close_deal cierra la venta dentro de la transacción, pero el alquiler queda parkeado para el agente.
