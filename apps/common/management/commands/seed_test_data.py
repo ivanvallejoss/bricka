@@ -46,8 +46,8 @@ from apps.listings.services import (
 
 from apps.properties.choices import PropertyType, PropertyStatus
 from apps.properties.models import ExternalPropertySource, Property, PropertyMedia
-from apps.properties.services import create_property, update_property_status  # +update_property_status
-
+from apps.properties.services import create_property
+from apps.operations.services import withdraw_property
 
 _SENTINEL_USERNAME = "bricka_seed"
 
@@ -870,9 +870,9 @@ class Command(BaseCommand):
             area_m2=Decimal("15.00"),
             owner_contact_id=ricardo.pk, actor=actor,
         )
-        update_property_status(
-            property=prop_unavail, status=PropertyStatus.UNAVAILABLE, actor=actor,
-        )  # camino manual — único modo de llegar a UNAVAILABLE hoy
+        withdraw_property(property=prop_unavail, actor=actor)
+        # camino con service: withdraw_property (AVAILABLE → UNAVAILABLE),
+        # que reconcilia listings vía el orquestador. Cierra el gap #6.
 
         # ── Listing DRAFT sobre la oficina expirada de F (AVAILABLE) ──────
         # La agencia empieza a re-listar la unidad vencida; aún sin publicar.

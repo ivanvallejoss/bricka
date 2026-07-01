@@ -7,14 +7,17 @@ from uuid import UUID
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
-from apps.properties.choices import PropertyStatus
-from apps.properties.services import update_property_status
+from .exceptions import InvalidPropertyTransition
+
 from apps.listings.choices import ListingStatus, OperationType
 from apps.listings.selectors import (
     get_active_publications_for_listings,
     get_listings_for_reconciliation,
 )
 from apps.listings.services import update_listing_status
+
+from apps.properties.choices import PropertyStatus
+from apps.properties.services import update_property_status, update_property
 
 if TYPE_CHECKING:
     from apps.listings.models import Listing
@@ -69,6 +72,84 @@ def transition_property_status(
         update_property_status(property=property, status=new_status, actor=actor)
         _reconcile_listings(property=property, new_status=new_status, actor=actor)
 
+    return property
+
+
+def withdraw_property(*, property: Property, actor: User | None) -> Property:
+    """
+    Retira una propiedad del mercado: AVAILABLE → UNAVAILABLE.
+
+    Retiro reversible (refacción, decisión del dueño). Pausa los listings
+    publicados vía el orquestador — salen de la landing pero retienen el slot.
+    Se revierte con restore_property. Cierra el gap #6: UNAVAILABLE era el único
+    estado sin service de transición.
+    """
+    if property.status != PropertyStatus.AVAILABLE:
+        raise InvalidPropertyTransition(
+            f"Solo se puede retirar del mercado una propiedad AVAILABLE "
+            f"(estado actual: {property.status})."
+        )
+    return transition_property_status(
+        property=property,
+        new_status=PropertyStatus.UNAVAILABLE,
+        actor=actor,
+    )
+
+
+def restore_property(*, property: Property, actor: User | None) -> Property:
+    """
+    Reactiva una propiedad retirada: UNAVAILABLE → AVAILABLE.
+
+    Despausa los listings pausados vía el orquestador (vuelven a la landing).
+    Inversa de withdraw_property.
+    """
+    if property.status != PropertyStatus.UNAVAILABLE:
+        raise InvalidPropertyTransition(
+            f"Solo se puede reactivar una propiedad UNAVAILABLE "
+            f"(estado actual: {property.status})."
+        )
+    return transition_property_status(
+        property=property,
+        new_status=PropertyStatus.AVAILABLE,
+        actor=actor,
+    )
+
+
+def remandate_property(
+    *,
+    property: Property,
+    new_owner_contact_id: UUID,
+    actor: User | None,
+) -> Property:
+    """
+    Re-mandato tras una venta: SOLD → AVAILABLE, con nuevo dueño.
+
+    Es la única salida sancionada de SOLD (Decisión 3): la propiedad vuelve al
+    mercado bajo el comprador y queda vendible de nuevo. Actualiza owner_contact
+    y reactiva vía el orquestador:
+      - alquiler (PAUSED) → PUBLISHED: el inversor sigue alquilando, vuelve a la
+        landing;
+      - venta (CLOSED) → queda quieto: representa una venta ya concretada; volver
+        a vender es crear un listing de venta fresco, no resucitar el viejo.
+
+    Republicar en canales externos sigue siendo manual (asimetría de slots).
+    """
+    if property.status != PropertyStatus.SOLD:
+        raise InvalidPropertyTransition(
+            f"Solo se puede re-mandar una propiedad SOLD "
+            f"(estado actual: {property.status})."
+        )
+    with transaction.atomic():
+        update_property(
+            property=property,
+            owner_contact_id=new_owner_contact_id,
+            actor=actor,
+        )
+        transition_property_status(
+            property=property,
+            new_status=PropertyStatus.AVAILABLE,
+            actor=actor,
+        )
     return property
 
 

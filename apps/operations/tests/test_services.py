@@ -1,6 +1,13 @@
 import pytest
 
-from apps.operations.services import transition_property_status
+from apps.operations.exceptions import InvalidPropertyTransition
+from apps.operations.services import (
+    remandate_property,
+    restore_property,
+    transition_property_status,
+    withdraw_property,
+)
+from apps.contacts.tests.factories import ContactFactory
 from apps.properties.choices import PropertyStatus
 from apps.properties.tests.factories import PropertyFactory
 from apps.listings.choices import ListingStatus, OperationType, PublicationStatus
@@ -255,3 +262,82 @@ class TestNoListings:
         )
         prop.refresh_from_db()
         assert prop.status == PropertyStatus.SOLD
+
+
+class TestWithdrawProperty:
+    def test_available_to_unavailable_pauses_listings(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        withdraw_property(property=prop, actor=actor)
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.UNAVAILABLE
+        assert _status(rent) == ListingStatus.PAUSED
+
+    def test_rejects_non_available(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        with pytest.raises(InvalidPropertyTransition):
+            withdraw_property(property=prop, actor=actor)
+
+
+class TestRestoreProperty:
+    def test_unavailable_to_available_unpauses_listings(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PAUSED,
+        )
+        restore_property(property=prop, actor=actor)
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.AVAILABLE
+        assert _status(rent) == ListingStatus.PUBLISHED
+
+    def test_rejects_non_unavailable(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        with pytest.raises(InvalidPropertyTransition):
+            restore_property(property=prop, actor=actor)
+
+
+class TestRemandateProperty:
+    def test_sold_to_available_updates_owner(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        buyer = ContactFactory()
+        remandate_property(
+            property=prop, new_owner_contact_id=buyer.pk, actor=actor
+        )
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.AVAILABLE
+        assert prop.owner_contact_id == buyer.pk
+
+    def test_revives_paused_rent_leaves_closed_sale(self, db, actor):
+        # el flujo inversor: el alquiler parkeado revive, la venta concretada
+        # queda como historia (no se resucita).
+        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        buyer = ContactFactory()
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PAUSED,
+        )
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.CLOSED,
+        )
+        remandate_property(
+            property=prop, new_owner_contact_id=buyer.pk, actor=actor
+        )
+        assert _status(rent) == ListingStatus.PUBLISHED
+        assert _status(sale) == ListingStatus.CLOSED
+
+    def test_rejects_non_sold(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        buyer = ContactFactory()
+        with pytest.raises(InvalidPropertyTransition):
+            remandate_property(
+                property=prop, new_owner_contact_id=buyer.pk, actor=actor
+            )
