@@ -11,7 +11,7 @@ from apps.contracts.exceptions import (
     ContractValidationError,
     InvalidContractStatus,
 )
-from apps.contracts.models import RentAdjustment
+from apps.contracts.models import RentAdjustment, RentalContract
 from apps.contracts.services import (
     activate_scheduled_contract,
     apply_rent_adjustment,
@@ -24,6 +24,8 @@ from apps.contracts.tests.factories import RentalContractFactory
 
 from apps.listings.choices import ListingStatus, OperationType
 from apps.listings.tests.factories import ListingFactory
+
+from apps.operations.exceptions import InvalidPropertyTransition
 
 from apps.properties.choices import PropertyStatus
 from apps.properties.tests.factories import PropertyFactory
@@ -532,3 +534,17 @@ class TestCreateRentalContractListingReconciliation:
         rent.refresh_from_db()
         assert rent.status == ListingStatus.CLOSED
         assert sale.status == ListingStatus.PUBLISHED
+
+    def test_create_rental_on_sold_property_raises_and_rolls_back(self):
+        # guard de SOLD end-to-end: crear un alquiler sobre una propiedad vendida
+        # intenta SOLD → RENTED, el guard lo frena, y la creación del contrato
+        # hace rollback (nada queda a medias).
+        actor = UserFactory()
+        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        tenant = ContactFactory()
+        owner = ContactFactory()
+        with pytest.raises(InvalidPropertyTransition):
+            create_rental_contract(
+                **_base_contract_kwargs(prop, tenant, owner, actor)
+            )
+        assert not RentalContract.objects.filter(property_id=prop.pk).exists()

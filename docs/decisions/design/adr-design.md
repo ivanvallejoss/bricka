@@ -1067,3 +1067,5 @@ atomicidad.
 El cierre del listing de venta NO es efecto de la transición: es efecto deal→listing (settle_won_sale).
 
 **La ocupación (RENTED) tiene precedencia sobre el evento de venta.** close_deal WON+SALE → settle_won_sale: cierra el listing de venta siempre; transiciona a SOLD solo si la propiedad estaba AVAILABLE. Una unidad alquilada que se vende sigue RENTED — el estado durativo no se pisa; el 'está vendida' se responde por el deal ganado + owner nuevo. Consecuencia: SOLD queda solo para vendidas-y-vacías, lo que hace limpio el guard de salida de SOLD.
+
+**Guard de SOLD (implementado).** `transition_property_status` rechaza toda transición saliente de una propiedad SOLD con InvalidPropertyTransition. La única salida sancionada es remandate_property, que entra por el motor interno `_apply_property_transition` (sin guard). Patrón: función pública guardada / motor sin guard / la salida legítima entra por el motor. Como con precedencia SOLD queda solo para vendidas-y-vacías, el guard no tiene falsos positivos: no hay caminos incidentales legítimos que salgan de SOLD.

@@ -195,7 +195,10 @@ class TestTransitionToAvailable:
         assert _status(rent) == ListingStatus.PUBLISHED
 
     def test_leaves_closed_listing_quiet(self, db, actor):
-        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        # un listing CLOSED queda quieto al volver a AVAILABLE. Se prueba desde
+        # UNAVAILABLE (restore), un origen que el guard de SOLD permite; el mismo
+        # comportamiento sobre el camino SOLD→AVAILABLE lo cubre TestRemandate.
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)
         closed = ListingFactory(
             property=prop,
             operation_type=OperationType.SALE,
@@ -205,7 +208,6 @@ class TestTransitionToAvailable:
             property=prop, new_status=PropertyStatus.AVAILABLE, actor=actor
         )
         assert _status(closed) == ListingStatus.CLOSED
-
 
 class TestSystemActor:
     def test_accepts_none_actor(self, db):
@@ -353,3 +355,31 @@ class TestRemandateProperty:
             remandate_property(
                 property=prop, new_owner_contact_id=buyer.pk, actor=actor
             )
+
+
+class TestSoldGuard:
+    def test_incidental_transition_out_of_sold_raises(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        with pytest.raises(InvalidPropertyTransition):
+            transition_property_status(
+                property=prop, new_status=PropertyStatus.RENTED, actor=actor
+            )
+
+    def test_guard_blocks_even_to_available(self, db, actor):
+        # ni siquiera SOLD → AVAILABLE pasa por la función pública: la única
+        # salida es remandate_property, que entra por el motor interno.
+        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        with pytest.raises(InvalidPropertyTransition):
+            transition_property_status(
+                property=prop, new_status=PropertyStatus.AVAILABLE, actor=actor
+            )
+
+    def test_remandate_is_the_sanctioned_exit(self, db, actor):
+        # remandate NO es bloqueado por el guard (va por el motor).
+        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        buyer = ContactFactory()
+        remandate_property(
+            property=prop, new_owner_contact_id=buyer.pk, actor=actor
+        )
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.AVAILABLE

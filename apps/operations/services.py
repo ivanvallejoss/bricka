@@ -64,9 +64,34 @@ def transition_property_status(
     llame un service que no pre-envuelve (withdraw/restore/remandate, paso 4),
     el atomic propio garantiza la atomicidad igual.
 
-    NOTA: todavía no incluye el guard que bloquea el deslizamiento silencioso
-    desde SOLD (paso 3 del orden de implementación). Hasta entonces cualquier
-    transición saliente de SOLD se ejecuta sin resistencia.
+    Guard de SOLD: ninguna transición incidental saca una propiedad de SOLD. La
+    única salida sancionada es remandate_property (SOLD → AVAILABLE con nuevo
+    dueño), que entra por el motor interno _apply_property_transition, no por
+    acá. Cualquier otro escritor sobre una propiedad SOLD recibe un error.
+    """
+    if property.status == PropertyStatus.SOLD:
+        raise InvalidPropertyTransition(
+            f"La propiedad está SOLD y no admite transiciones incidentales "
+            f"(intento: SOLD → {new_status}). Para reactivarla, usá "
+            f"remandate_property (re-mandato con el nuevo dueño)."
+        )
+    return _apply_property_transition(
+        property=property, new_status=new_status, actor=actor
+    )
+
+
+def _apply_property_transition(
+    *,
+    property: Property,
+    new_status: str,
+    actor: User | None,
+) -> Property:
+    """
+    Motor de transición SIN guard: escribe el estado (delegando en
+    update_property_status) + reconcilia listings + surface. Lo llaman
+    transition_property_status (público, con el guard de SOLD) y
+    remandate_property (la salida sancionada de SOLD, que por eso entra por el
+    motor y no por la función pública).
     """
     with transaction.atomic():
         update_property_status(property=property, status=new_status, actor=actor)
@@ -145,7 +170,7 @@ def remandate_property(
             owner_contact_id=new_owner_contact_id,
             actor=actor,
         )
-        transition_property_status(
+        _apply_property_transition(
             property=property,
             new_status=PropertyStatus.AVAILABLE,
             actor=actor,
