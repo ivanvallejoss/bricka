@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from apps.common.utils import UNSET
 from apps.properties.choices import PropertyStatus
-from apps.operations.services import transition_property_status
+from apps.operations.services import settle_won_sale, transition_property_status
 
 from .choices import DealOutcome, DealType
 from .exceptions import DealAlreadyClosed, DealValidationError
@@ -96,14 +96,14 @@ def close_deal(
 ) -> Deal:
     """
     Side effects cuando outcome=WON y deal.listing_id no es null:
-      RENT → Property.status = RENTED
-      SALE → Property.status = SOLD
+      RENT → Property.status = RENTED (vía orquestador: cierra el listing de
+             alquiler; deja el de venta si existe).
+      SALE → settle_won_sale: cierra el listing de venta siempre, y transiciona
+             a SOLD SOLO si la propiedad estaba AVAILABLE. Si está RENTED, la
+             ocupación gana y el estado no se pisa (regla de precedencia).
 
-    El cambio de estado pasa por operations.transition_property_status, que
-    además reconcilia los listings de la propiedad (RENT cierra el de alquiler y
-    deja el de venta; SALE cierra el de venta y pausa el de alquiler) y hace
-    surface de las publicaciones externas a dar de baja. Este service no toca
-    listings directamente.
+    La coordinación cross-entity (listings, estado, surface) vive en operations;
+    este service no toca listings ni Property.status directamente.
 
     Sin side effect para propiedades ajenas (deal.listing_id is None).
     """
@@ -118,16 +118,14 @@ def close_deal(
 
         if outcome == DealOutcome.WON and deal.listing_id is not None:
             prop = deal.listing.property
-            new_status = (
-                PropertyStatus.RENTED
-                if deal.deal_type == DealType.RENT
-                else PropertyStatus.SOLD
-            )
-            transition_property_status(
-                property=prop,
-                new_status=new_status,
-                actor=actor,
-            )
+            if deal.deal_type == DealType.RENT:
+                transition_property_status(
+                    property=prop,
+                    new_status=PropertyStatus.RENTED,
+                    actor=actor,
+                )
+            else:  # SALE
+                settle_won_sale(property=prop, actor=actor)
 
     return deal
 

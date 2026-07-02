@@ -6,6 +6,7 @@ from apps.operations.services import (
     restore_property,
     transition_property_status,
     withdraw_property,
+    settle_won_sale
 )
 from apps.contacts.tests.factories import ContactFactory
 from apps.properties.choices import PropertyStatus
@@ -21,6 +22,11 @@ def _status(listing: Listing) -> str:
 
 
 class TestTransitionToSold:
+    """
+    Reconciliación cruda de SOLD: solo pausa el alquiler. El cierre del listing
+    de venta NO vive acá — es efecto de settle_won_sale (deal→listing).
+    """
+
     def test_writes_property_status(self, db, actor):
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
         transition_property_status(
@@ -29,21 +35,7 @@ class TestTransitionToSold:
         prop.refresh_from_db()
         assert prop.status == PropertyStatus.SOLD
 
-    def test_closes_sale_listing(self, db, actor):
-        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
-        sale = ListingFactory(
-            property=prop,
-            operation_type=OperationType.SALE,
-            status=ListingStatus.PUBLISHED,
-        )
-        transition_property_status(
-            property=prop, new_status=PropertyStatus.SOLD, actor=actor
-        )
-        assert _status(sale) == ListingStatus.CLOSED
-
-    def test_pauses_rent_listing_does_not_close_it(self, db, actor):
-        # regla de negocio: una unidad vendida puede seguir alquilándose si el
-        # nuevo dueño sigue el mandato. El alquiler se pausa, no se cierra.
+    def test_pauses_rent_listing(self, db, actor):
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
         rent = ListingFactory(
             property=prop,
@@ -54,37 +46,6 @@ class TestTransitionToSold:
             property=prop, new_status=PropertyStatus.SOLD, actor=actor
         )
         assert _status(rent) == ListingStatus.PAUSED
-
-    def test_sale_closes_and_rent_pauses_together(self, db, actor):
-        # el escenario clave: propiedad publicada para venta y alquiler a la vez.
-        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
-        sale = ListingFactory(
-            property=prop,
-            operation_type=OperationType.SALE,
-            status=ListingStatus.PUBLISHED,
-        )
-        rent = ListingFactory(
-            property=prop,
-            operation_type=OperationType.RENT,
-            status=ListingStatus.PUBLISHED,
-        )
-        transition_property_status(
-            property=prop, new_status=PropertyStatus.SOLD, actor=actor
-        )
-        assert _status(sale) == ListingStatus.CLOSED
-        assert _status(rent) == ListingStatus.PAUSED
-
-    def test_closes_paused_sale_listing(self, db, actor):
-        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
-        sale = ListingFactory(
-            property=prop,
-            operation_type=OperationType.SALE,
-            status=ListingStatus.PAUSED,
-        )
-        transition_property_status(
-            property=prop, new_status=PropertyStatus.SOLD, actor=actor
-        )
-        assert _status(sale) == ListingStatus.CLOSED
 
     def test_already_paused_rent_stays_paused(self, db, actor):
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
@@ -98,17 +59,68 @@ class TestTransitionToSold:
         )
         assert _status(rent) == ListingStatus.PAUSED
 
-    def test_leaves_draft_listing_untouched(self, db, actor):
+    def test_does_not_close_sale_listing(self, db, actor):
+        # el cierre de venta es efecto de settle_won_sale, no de la transición.
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
-        draft = ListingFactory(
+        sale = ListingFactory(
             property=prop,
             operation_type=OperationType.SALE,
-            status=ListingStatus.DRAFT,
+            status=ListingStatus.PUBLISHED,
         )
         transition_property_status(
             property=prop, new_status=PropertyStatus.SOLD, actor=actor
         )
-        assert _status(draft) == ListingStatus.DRAFT
+        assert _status(sale) == ListingStatus.PUBLISHED
+
+
+class TestSettleWonSale:
+    def test_available_closes_sale_and_transitions_sold(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        settle_won_sale(property=prop, actor=actor)
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.SOLD
+        assert _status(sale) == ListingStatus.CLOSED
+
+    def test_available_with_rent_pauses_rent(self, db, actor):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        settle_won_sale(property=prop, actor=actor)
+        assert _status(sale) == ListingStatus.CLOSED
+        assert _status(rent) == ListingStatus.PAUSED
+
+    def test_rented_closes_sale_keeps_rented(self, db, actor):
+        # precedencia: vender una unidad alquilada cierra el listing de venta
+        # pero NO pisa la ocupación — sigue RENTED, alquiler intacto.
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        settle_won_sale(property=prop, actor=actor)
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.RENTED
+        assert _status(sale) == ListingStatus.CLOSED
+        assert _status(rent) == ListingStatus.PUBLISHED
 
 
 class TestTransitionToRented:

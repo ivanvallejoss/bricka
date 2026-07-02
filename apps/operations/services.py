@@ -153,6 +153,39 @@ def remandate_property(
     return property
 
 
+def settle_won_sale(*, property: Property, actor: User | None) -> Property:
+    """
+    Efecto de una venta ganada, coordinando listing + estado de ocupación.
+
+    Dos efectos, con disparadores distintos:
+      1. deal→listing (siempre): cierra el listing de venta — la operación se
+         concretó, ese listing representa una venta cerrada — y hace surface de
+         su publicación externa.
+      2. property→ocupación (con precedencia): transiciona a SOLD SOLO si la
+         propiedad estaba AVAILABLE (vacía). Si está RENTED, la ocupación gana
+         (estado durativo) y la venta no la pisa — sigue RENTED, con contrato e
+         inquilino intactos, y el "está vendida" se responde por el deal ganado.
+
+    Es el único camino a SOLD. Lo llama close_deal (WON + SALE).
+    """
+    with transaction.atomic():
+        closed = _close_listings(
+            property_id=property.pk,
+            actor=actor,
+            operation_types=[OperationType.SALE],
+        )
+        _surface_external_publications(closed)
+
+        if property.status == PropertyStatus.AVAILABLE:
+            transition_property_status(
+                property=property,
+                new_status=PropertyStatus.SOLD,
+                actor=actor,
+            )
+
+    return property
+
+
 def _reconcile_listings(
     *,
     property: Property,
@@ -168,23 +201,17 @@ def _reconcile_listings(
     AuditedQuerySet lo bloquea a propósito para no saltear el audit log.
     """
     if new_status == PropertyStatus.SOLD:
-        # La venta se concretó: cerrar los listings de venta (no se puede seguir
-        # vendiendo lo ya vendido). El alquiler NO se cierra: si el nuevo dueño
-        # sigue el mandato, la unidad sigue alquilable — dato de negocio que la
-        # función no conoce y solo sabe el agente. Se pausa (sale de la landing,
-        # retiene el slot) y queda como decisión humana explícita: reactivar
-        # (caso inversor) o cerrar deliberadamente.
-        closed = _close_listings(
-            property_id=property.pk,
-            actor=actor,
-            operation_types=[OperationType.SALE],
-        )
+        # A SOLD se llega solo por una venta ganada sobre una unidad vacía
+        # (precedencia: si estaba alquilada, se mantiene RENTED — ver
+        # settle_won_sale). El cierre del listing de venta es efecto deal→listing
+        # y ya ocurrió en settle_won_sale; acá queda solo el efecto de ocupación:
+        # pausar el alquiler (parkeado — el nuevo dueño puede seguir el mandato).
         paused = _pause_listings(
             property_id=property.pk,
             actor=actor,
             operation_types=_RENT_OPERATION_TYPES,
         )
-        _surface_external_publications(closed + paused)
+        _surface_external_publications(paused)
 
     elif new_status == PropertyStatus.RENTED:
         # Cerrar solo los de alquiler; el de venta sigue vivo (published).

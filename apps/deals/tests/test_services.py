@@ -323,3 +323,34 @@ class TestCloseDealListingReconciliation:
         rent.refresh_from_db()
         assert rent.status == ListingStatus.CLOSED
         assert sale.status == ListingStatus.PUBLISHED
+
+    def test_won_sale_on_rented_keeps_rented(self):
+        # precedencia: vender una unidad alquilada cierra el listing de venta
+        # pero mantiene RENTED — la ocupación gana sobre el evento de venta.
+        actor = UserFactory()
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        sale = ListingFactory(
+            property=prop,
+            operation_type=OperationType.SALE,
+            status=ListingStatus.PUBLISHED,
+        )
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PUBLISHED,
+        )
+        deal = DealFactory.create(
+            with_listing=True,
+            listing=sale,
+            deal_type=DealType.SALE,
+            outcome="",
+            created_by=actor,
+            updated_by=actor,
+        )
+        close_deal(deal=deal, outcome=DealOutcome.WON, actor=actor)
+        prop.refresh_from_db()
+        sale.refresh_from_db()
+        rent.refresh_from_db()
+        assert prop.status == PropertyStatus.RENTED
+        assert sale.status == ListingStatus.CLOSED
+        assert rent.status == ListingStatus.PUBLISHED

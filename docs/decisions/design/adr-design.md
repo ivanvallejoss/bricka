@@ -1064,3 +1064,6 @@ caller previo (withdraw/restore/remandate), el atomic propio garantiza la
 atomicidad.
 
 **El alquiler no se cierra en SOLD — se pausa.** "Vendido = fuera del mercado de alquiler" es una regla de negocio que la función no puede conocer: solo el agente sabe si el comprador es un inversor que sigue el mandato de alquiler. Cerrar el listing de alquiler automáticamente sería automatización de más. SOLD lo pausa (fuera de la landing, retiene el slot) y deja la decisión —reactivar o cerrar— como paso humano explícito. Esto resuelve el gap #7 con matiz: close_deal cierra la venta dentro de la transacción, pero el alquiler queda parkeado para el agente.
+El cierre del listing de venta NO es efecto de la transición: es efecto deal→listing (settle_won_sale).
+
+**La ocupación (RENTED) tiene precedencia sobre el evento de venta.** close_deal WON+SALE → settle_won_sale: cierra el listing de venta siempre; transiciona a SOLD solo si la propiedad estaba AVAILABLE. Una unidad alquilada que se vende sigue RENTED — el estado durativo no se pisa; el 'está vendida' se responde por el deal ganado + owner nuevo. Consecuencia: SOLD queda solo para vendidas-y-vacías, lo que hace limpio el guard de salida de SOLD.

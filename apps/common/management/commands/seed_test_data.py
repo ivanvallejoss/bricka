@@ -526,9 +526,6 @@ class Command(BaseCommand):
         )
         close_deal(deal=deal, outcome=DealOutcome.WON, actor=actor)  # → prop.status SOLD
 
-        # Coherencia: la unidad vendida no sigue publicada (close_deal no lo hace).
-        update_listing_status(listing=listing, status=ListingStatus.CLOSED, actor=actor)
-
         # Comisión split: 3% comprador + 3% vendedor, dos recibos, un deal, USD.
         commission = (Decimal("120000.00") * Decimal("0.03")).quantize(Decimal("0.01"))  # 3600.00
         create_billing_document(
