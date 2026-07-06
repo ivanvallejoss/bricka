@@ -17,7 +17,7 @@ from apps.properties.services import (
     update_property,
     upload_property_media,
 )
-from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory
+from .factories import PropertyFactory, PropertyMediaFactory, FeatureFactory
 
 
 class TestCreateProperty:
@@ -250,3 +250,68 @@ class TestDeletePropertyMedia:
         media_pk = media.pk
         delete_property_media(media=media)
         assert not PropertyMedia.objects.filter(pk=media_pk).exists()
+
+
+class TestPropertyFeatures:
+    def _create(self, actor, **kwargs):
+        return create_property(
+            property_type=PropertyType.APARTMENT,
+            address_line="Calle 123",
+            city="Resistencia",
+            province="Chaco",
+            area_m2=Decimal("80.00"),
+            actor=actor,
+            **kwargs,
+        )
+
+    def test_create_assigns_features_by_slug(self, db, actor):
+        FeatureFactory(slug="balcon")
+        FeatureFactory(slug="patio")
+        prop = self._create(actor, features=["balcon", "patio"])
+        assert set(prop.features.values_list("slug", flat=True)) == {"balcon", "patio"}
+
+    def test_create_without_features_leaves_empty(self, db, actor):
+        prop = self._create(actor)
+        assert prop.features.count() == 0
+
+    def test_create_rejects_unknown_slug(self, db, actor):
+        FeatureFactory(slug="balcon")
+        with pytest.raises(PropertyValidationError, match="desconocidas"):
+            self._create(actor, features=["balcon", "pileta"])
+
+    def test_create_rejects_inactive_slug(self, db, actor):
+        FeatureFactory(slug="balcon", is_active=False)
+        with pytest.raises(PropertyValidationError, match="inactivas"):
+            self._create(actor, features=["balcon"])
+
+    def test_rejection_writes_nothing(self, db, actor):
+        with pytest.raises(PropertyValidationError):
+            self._create(actor, features=["inexistente"])
+        assert Property.objects.count() == 0
+
+    def test_update_none_does_not_touch_features(self, db, actor):
+        FeatureFactory(slug="balcon")
+        prop = self._create(actor, features=["balcon"])
+        update_property(property=prop, city="Corrientes", actor=actor)
+        assert list(prop.features.values_list("slug", flat=True)) == ["balcon"]
+
+    def test_update_empty_list_clears_features(self, db, actor):
+        FeatureFactory(slug="balcon")
+        prop = self._create(actor, features=["balcon"])
+        update_property(property=prop, features=[], actor=actor)
+        assert prop.features.count() == 0
+
+    def test_update_list_replaces_features(self, db, actor):
+        FeatureFactory(slug="balcon")
+        FeatureFactory(slug="patio")
+        prop = self._create(actor, features=["balcon"])
+        update_property(property=prop, features=["patio"], actor=actor)
+        assert list(prop.features.values_list("slug", flat=True)) == ["patio"]
+
+    def test_inactive_historical_assignment_survives_unrelated_update(self, db, actor):
+        feature = FeatureFactory(slug="balcon")
+        prop = self._create(actor, features=["balcon"])
+        feature.is_active = False
+        feature.save(update_fields=["is_active"])
+        update_property(property=prop, city="Corrientes", actor=actor)
+        assert list(prop.features.values_list("slug", flat=True)) == ["balcon"]

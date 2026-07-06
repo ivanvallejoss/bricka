@@ -174,16 +174,18 @@ Secciones internas usan hx-trigger="revealed" para carga lazy.
 
             </div>
 
-            {# Features — JSONField, estructura a definir cuando tenga valores reales #}
-            {% if property.features %}
+            {# Features — vocabulario controlado, render por label #}
+            {% with features=property.features.all %}
+            {% if features %}
             <div class="mt-3 flex flex-wrap gap-1.5">
-                {% for feature in property.features %}
+                {% for feature in features %}
                 <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant border border-outline">
-                    {{ feature }}
+                    {{ feature.label }}
                 </span>
                 {% endfor %}
             </div>
             {% endif %}
+            {% endwith %}
 
         </div>
         

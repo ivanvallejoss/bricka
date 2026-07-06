@@ -7,6 +7,34 @@ from apps.common.models import AuditableMixin
 from .choices import PropertyType, PropertyStatus
 
 
+class Feature(BaseModel):
+    """
+    Vocabulario controlado de características de propiedades.
+    Presencia/ausencia — los atributos con valor asociado son columnas
+    de primera clase en Property (bedrooms, area_m2, parking_spaces).
+
+    - slug: identificador estable para services/seed/tests. No se renombra.
+    - label: display, editable libremente (el afinado de vocabulario vive acá).
+    - is_active: retiro suave. Nunca se borra una Feature — el borrado en
+      cascada limpiaría silenciosamente features de propiedades existentes.
+      is_active=False la saca de formularios sin tocar historia.
+
+    Decisión negativa v1: sin category, icon ni order manual.
+    Se agregan cuando exista un consumidor. Ver docs/decisions.
+    """
+    slug = models.SlugField(max_length=50, unique=True)
+    label = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["label"]
+        verbose_name = "característica"
+        verbose_name_plural = "características"
+
+    def __str__(self):
+        return self.label
+
+
 class Property(SoftDeleteModel, AuditableMixin):
     """
     Unidad inmobiliaria — propia o de otra inmobiliaria (is_external).
@@ -20,7 +48,7 @@ class Property(SoftDeleteModel, AuditableMixin):
     Ver documentación de sesión — pendiente antes de implementar vistas.
     """
     title = models.CharField(max_length=150, blank=True)
-    description = models.TextField()
+    description = models.TextField(blank=True)
     property_type = models.CharField(
         max_length=20,
         choices=PropertyType.choices,
@@ -33,6 +61,8 @@ class Property(SoftDeleteModel, AuditableMixin):
     area_m2 = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     bedrooms = models.SmallIntegerField(null=True, blank=True)
     bathrooms = models.SmallIntegerField(null=True, blank=True)
+    # null = sin dato, 0 = explicitamente no tiene (misma convencion que bedrooms/bathrooms). La distincion importa para el portal.
+    parking_spaces = models.SmallIntegerField(null=True, blank=True)
     year_built = models.SmallIntegerField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
@@ -47,7 +77,12 @@ class Property(SoftDeleteModel, AuditableMixin):
         related_name="owned_properties",
     )
     is_external = models.BooleanField(default=False)
-    features = models.JSONField(default=dict, blank=True)
+
+    features = models.ManyToManyField(
+        Feature,
+        related_name="properties",
+        blank=True,
+    )
     youtube_video_url = models.URLField(blank=True)
 
     class Meta:

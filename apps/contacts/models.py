@@ -100,7 +100,11 @@ class SearchPreference(TimestampModel):
     bedrooms_min = models.SmallIntegerField(null=True, blank=True)
     neighborhoods = models.JSONField(default=list, blank=True)
     property_types = models.JSONField(default=list, blank=True)
-    features_required = models.JSONField(default=dict, blank=True)
+    features_required = models.ManyToManyField(
+        "properties.feature",
+        related_name="search_preferences",
+        blank=True
+    )
     active = models.BooleanField(default=True)
 
     class Meta:

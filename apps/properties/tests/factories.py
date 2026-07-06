@@ -2,7 +2,7 @@ import factory
 from decimal import Decimal
 
 from apps.contacts.tests.factories import UserFactory
-from apps.properties.models import Property, ExternalPropertySource, PropertyMedia
+from apps.properties.models import Property, ExternalPropertySource, PropertyMedia, Feature
 from apps.properties.choices import PropertyType, PropertyStatus
 
 
@@ -38,3 +38,13 @@ class PropertyMediaFactory(factory.django.DjangoModelFactory):
     order = 0
     is_cover = False
     created_by = factory.SubFactory(UserFactory)
+
+
+class FeatureFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Feature
+        django_get_or_create = ("slug",)
+
+    slug = factory.Sequence(lambda n: f"feature_{n}")
+    label = factory.LazyAttribute(lambda o: o.slug.replace("_", " ").capitalize())
+    is_active = True

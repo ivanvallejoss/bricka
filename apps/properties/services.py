@@ -4,8 +4,34 @@ from uuid import UUID
 from django.db import transaction
 
 from apps.users.models import User
-from apps.properties.models import ExternalPropertySource, Property, PropertyMedia
+from apps.properties.models import ExternalPropertySource, Property, PropertyMedia, Feature
 from apps.properties.exceptions import PropertyValidationError
+
+
+def _resolve_features(slugs: list[str]) -> list[Feature]:
+    """
+    Traduce slugs a filas de Feature con validación estricta.
+    Rechazo explícito, nunca filtrado silencioso.
+    Slug inactivo rechaza en escritura nueva — las asignaciones
+    históricas no se tocan (viven en el M2M, no pasan por acá).
+    """
+    unique = set(slugs)
+    if not unique:
+        return []
+
+    rows = {f.slug: f for f in Feature.objects.filter(slug__in=unique)}
+    unknown = sorted(unique - rows.keys())
+    inactive = sorted(s for s in unique & rows.keys() if not rows[s].is_active)
+
+    if unknown or inactive:
+        parts = []
+        if unknown:
+            parts.append(f"desconocidas: {', '.join(unknown)}")
+        if inactive:
+            parts.append(f"inactivas: {', '.join(inactive)}")
+        raise PropertyValidationError(f"Features inválidas — {'; '.join(parts)}.")
+
+    return list(rows.values())
 
 
 def create_property(
@@ -33,6 +59,8 @@ def create_property(
             "Una propiedad externa requiere el nombre de la agencia."
         )
 
+    feature_rows = _resolve_features(features) if features else []
+
     with transaction.atomic():
         property = Property(
             property_type=property_type,
@@ -45,13 +73,15 @@ def create_property(
             bathrooms=bathrooms,
             year_built=year_built,
             youtube_video_url=youtube_video_url,
-            features=features or [],
             owner_contact_id=owner_contact_id,
             is_external=is_external,
             created_by=actor,
             updated_by=actor,
         )
         property.save()
+
+        if feature_rows:
+            property.features.set(feature_rows)
 
         if is_external:
             ExternalPropertySource.objects.create(
@@ -118,16 +148,20 @@ def update_property(
         property.youtube_video_url = youtube_video_url
         update_fields.append("youtube_video_url")
 
+    feature_rows: list[Feature] | None = None
     if features is not None:
-        property.features = features
-        update_fields.append("features")
+        feature_rows = _resolve_features(features)
 
     if owner_contact_id is not None:
         property.owner_contact_id = owner_contact_id
         update_fields.append("owner_contact_id")
         
     property.updated_by = actor
-    property.save(update_fields=update_fields)
+    
+    with transaction.atomic():
+        property.save(update_fields=update_fields)
+        if feature_rows is not None:
+            property.features.set(feature_rows)
 
     return property
 
