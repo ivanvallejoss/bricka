@@ -127,18 +127,45 @@ class TestUpdateProperty:
         prop.refresh_from_db()
         assert prop.updated_at > old_time
 
-    def test_none_fields_not_modified(self, db, actor):
-        prop = PropertyFactory(city="Resistencia")
-        update_property(property=prop, city=None, actor=actor)
-        prop.refresh_from_db()
-        assert prop.city == "Resistencia"
-
     def test_updates_actor_as_updated_by(self, db, actor):
         other_actor = UserFactory()
         prop = PropertyFactory(created_by=other_actor, updated_by=other_actor)
         update_property(property=prop, city="Buenos Aires", actor=actor)
         prop.refresh_from_db()
         assert prop.updated_by == actor
+    
+    def test_omitted_fields_are_not_touched(self, db, actor):
+        prop = PropertyFactory(title="Depto céntrico", parking_spaces=2)
+        update_property(property=prop, city="Corrientes", actor=actor)
+        prop.refresh_from_db()
+        assert prop.title == "Depto céntrico"
+        assert prop.parking_spaces == 2
+        assert prop.city == "Corrientes"
+
+    def test_none_blanks_parking_spaces(self, db, actor):
+        prop = PropertyFactory(parking_spaces=2)
+        update_property(property=prop, parking_spaces=None, actor=actor)
+        prop.refresh_from_db()
+        assert prop.parking_spaces is None
+
+    def test_zero_parking_spaces_is_a_value(self, db, actor):
+        prop = PropertyFactory(parking_spaces=2)
+        update_property(property=prop, parking_spaces=0, actor=actor)
+        prop.refresh_from_db()
+        assert prop.parking_spaces == 0
+
+    def test_empty_string_blanks_description(self, db, actor):
+        prop = PropertyFactory(description="Luminoso 3 ambientes")
+        update_property(property=prop, description="", actor=actor)
+        prop.refresh_from_db()
+        assert prop.description == ""
+
+    def test_none_unsets_owner_contact(self, db, actor):
+        owner = ContactFactory()
+        prop = PropertyFactory(owner_contact=owner)
+        update_property(property=prop, owner_contact_id=None, actor=actor)
+        prop.refresh_from_db()
+        assert prop.owner_contact_id is None
 
 
 class TestArchiveProperty:
@@ -288,7 +315,7 @@ class TestPropertyFeatures:
             self._create(actor, features=["inexistente"])
         assert Property.objects.count() == 0
 
-    def test_update_none_does_not_touch_features(self, db, actor):
+    def test_update_omitted_features_are_not_touched(self, db, actor):
         FeatureFactory(slug="balcon")
         prop = self._create(actor, features=["balcon"])
         update_property(property=prop, city="Corrientes", actor=actor)

@@ -190,19 +190,6 @@ class Command(BaseCommand):
         lon, lat = _RESISTENCIA_POINTS[key]
         return Point(lon, lat, srid=4326)
 
-    def _make_property(self, *, title, description, location, actor, **kwargs):
-        """
-        create_property no expone title/description/location en su firma —
-        se parchean post-create. Si location pasa a ser campo de formulario
-        real, se mueve adentro del service.
-        """
-        prop = create_property(**kwargs, actor=actor)
-        prop.title = title
-        prop.description = description
-        prop.location = location
-        prop.save(update_fields=["title", "description", "location", "updated_at"])
-        return prop
-
     def _summary(self) -> None:
         self.stdout.write(
             "\n  ───────────────────────────────\n"
@@ -251,7 +238,7 @@ class Command(BaseCommand):
             role=ContactRole.TENANT, source=ContactSource.ZONAPROP, actor=actor,
         )
 
-        prop = self._make_property(
+        prop = create_property(
             title="Departamento 3 ambientes — Centro",
             description=("Luminoso 3 ambientes sobre la peatonal, cocina "
                          "equipada y balcón a la plaza. Portería y ascensor."),
@@ -322,7 +309,7 @@ class Command(BaseCommand):
             role=ContactRole.TENANT, source=ContactSource.FACEBOOK, actor=actor,
         )
 
-        prop = self._make_property(
+        prop = create_property(
             title="Casa 3 dormitorios — Villa del Parque",
             description=("Casa familiar con patio y garaje para dos autos. "
                          "Living comedor amplio, tres dormitorios, lavadero."),
@@ -331,7 +318,8 @@ class Command(BaseCommand):
             address_line="Av. 25 de Mayo 1840",
             city="Resistencia", neighborhood="Villa del Parque", province="Chaco",
             area_m2=Decimal("120.00"), bedrooms=3, bathrooms=1, year_built=1998,
-            features=["patio", "lavadero"], # TODO paso2: parkin_spaces=1 (tenia cochera)
+            features=["patio", "lavadero"],
+            parking_spaces=1,
             owner_contact_id=owner.pk, actor=actor,
         )
 
@@ -414,7 +402,7 @@ class Command(BaseCommand):
         )
 
         # ── C1: banner DANGER (vencido) ──────────────────────────────────
-        prop_c1 = self._make_property(
+        prop_c1 = create_property(
             title="Departamento 2 ambientes — España",
             description=("Dos ambientes funcional, cocina integrada y balcón "
                          "corrido. Apto profesional."),
@@ -439,7 +427,7 @@ class Command(BaseCommand):
         )
 
         # ── C2: banner WARNING (próximo) + FIXED_PERCENT ─────────────────
-        prop_c2 = self._make_property(
+        prop_c2 = create_property(
             title="Local comercial — Villa Sarmiento",
             description=("Local a la calle con vidriera, baño y depósito. "
                          "Apto rubro gastronómico o comercial."),
@@ -495,7 +483,7 @@ class Command(BaseCommand):
             role=ContactRole.INTERESTED, source=ContactSource.ZONAPROP, actor=actor,
         )
 
-        prop = self._make_property(
+        prop = create_property(
             title="Casa 4 dormitorios — Barrio Norte",
             description=("Casa sobre lote propio, cuatro dormitorios, quincho "
                          "con parrilla y cochera doble. Lista para escriturar."),
@@ -504,7 +492,8 @@ class Command(BaseCommand):
             address_line="López y Planes 1560",
             city="Resistencia", neighborhood="Barrio Norte", province="Chaco",
             area_m2=Decimal("210.00"), bedrooms=4, bathrooms=2, year_built=2012,
-            features=["quincho", "parrilla", "lote_propio"], # TODO paso 2: parking_spaces=2
+            features=["quincho", "parrilla", "lote_propio"],
+            parking_spaces=2,
             owner_contact_id=seller.pk, actor=actor,
         )
 
@@ -566,7 +555,7 @@ class Command(BaseCommand):
             role=ContactRole.TENANT, source=ContactSource.REFERRAL, actor=actor,
         )
 
-        prop = self._make_property(
+        prop = create_property(
             title="Departamento 1 ambiente — Güemes",
             description=("Monoambiente a estrenar, cocina americana, ideal "
                          "inversión o estudiante. Disponible desde el mes próximo."),
@@ -625,7 +614,7 @@ class Command(BaseCommand):
             phone="362-4120300", document_type="dni", document_number="21333222",
             role=ContactRole.TENANT, source=ContactSource.DIRECT, actor=actor,
         )
-        prop_exp = self._make_property(
+        prop_exp = create_property(
             title="Oficina — San Fernando",
             description=("Oficina en planta alta, sobre avenida. Recepción, "
                          "dos privados y kitchenette."),
@@ -655,7 +644,7 @@ class Command(BaseCommand):
             phone="362-4130400", document_type="dni", document_number="27888777",
             role=ContactRole.TENANT, source=ContactSource.WHATSAPP, actor=actor,
         )
-        prop_term = self._make_property(
+        prop_term = create_property(
             title="Casa 2 dormitorios — Villa Forestación",
             description=("Casa con patio y cochera. Dos dormitorios, living "
                          "comedor con cocina integrada."),
@@ -664,7 +653,8 @@ class Command(BaseCommand):
             address_line="Pellegrini 1490",
             city="Resistencia", neighborhood="Villa Forestación", province="Chaco",
             area_m2=Decimal("95.00"), bedrooms=2, bathrooms=1, year_built=2009,
-            features=["patio", "cocina"], # TODO paso 2: parking_spaces=1
+            features=["patio", "cocina"],
+            parking_spaces=1 ,
             owner_contact_id=owner.pk, actor=actor,
         )
         start_term = today - relativedelta(months=6)
@@ -710,7 +700,7 @@ class Command(BaseCommand):
         actor, today = ctx["actor"], ctx["today"]
 
         # ── G1: Propiedad externa co-publicada ───────────────────────────
-        prop_ext = self._make_property(
+        prop_ext = create_property(
             title="Departamento 2 ambientes — Villa Libertad (externa)",
             description=("Dos ambientes en pozo avanzado, co-publicado con "
                          "Inmobiliaria del Litoral. Comisión compartida."),
@@ -857,7 +847,7 @@ class Command(BaseCommand):
         graciela = ctx["c"]["owner"]
 
         # ── Property UNAVAILABLE (gap #6: no hay service de transición) ────
-        prop_unavail = self._make_property(
+        prop_unavail = create_property(
             title="Cochera — Villa Chica",
             description="Cochera cubierta, retirada del mercado por refacción.",
             location=self._point("villa_chica"),
@@ -881,7 +871,7 @@ class Command(BaseCommand):
         )  # status DRAFT por defecto, no se publica
 
         # ── Listing PENDING_APPROVAL sobre un terreno nuevo (LAND/venta) ──
-        prop_land = self._make_property(
+        prop_land = create_property(
             title="Terreno 600 m² — Ejido Norte",
             description="Lote en zona de expansión, servicios en la traza. Apto construir.",
             location=self._point("ejido_norte"),
@@ -956,7 +946,7 @@ class Command(BaseCommand):
         )
 
         # ── Dos unidades de Beatriz, ambas RENTED y al día ────────────────
-        prop_1 = self._make_property(
+        prop_1 = create_property(
             title="Departamento 2 ambientes — Centro",
             description="Dos ambientes sobre avenida, luminoso. En administración.",
             location=self._point("centro"),
@@ -966,7 +956,7 @@ class Command(BaseCommand):
             area_m2=Decimal("54.00"), bedrooms=2, bathrooms=1, year_built=2016,
             features=["balcon"], owner_contact_id=owner.pk, actor=actor,
         )
-        prop_2 = self._make_property(
+        prop_2 = create_property(
             title="Departamento 1 ambiente — Güemes",
             description="Monoambiente funcional, en administración.",
             location=self._point("guemes"),

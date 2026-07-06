@@ -2,7 +2,9 @@ from decimal import Decimal
 from uuid import UUID
 
 from django.db import transaction
+from django.contrib.gis.geos import Point
 
+from apps.common.sentinels import UNSET
 from apps.users.models import User
 from apps.properties.models import ExternalPropertySource, Property, PropertyMedia, Feature
 from apps.properties.exceptions import PropertyValidationError
@@ -40,10 +42,14 @@ def create_property(
     address_line: str,
     city: str,
     province: str,
-    area_m2: Decimal,
+    title: str = "",
+    description: str = "",
     neighborhood: str = "",
+    location: Point | None = None,
+    area_m2: Decimal | None = None,
     bedrooms: int | None = None,
     bathrooms: int | None = None,
+    parking_spaces: int | None = None,
     year_built: int | None = None,
     youtube_video_url: str = "",
     features: list[str] | None = None,
@@ -54,6 +60,11 @@ def create_property(
     agreed_commission_percent: Decimal | None = None,
     actor: User,
 ) -> Property:
+    """
+    Umbral de creación = operable, no publicable (ver docs/decisions):
+    lo obligatorio es que la propiedad sea identificable y asociable.
+    Las exigencias de completitud viven en el gate de publicación.
+    """
     if is_external and not agency_name:
         raise PropertyValidationError(
             "Una propiedad externa requiere el nombre de la agencia."
@@ -67,10 +78,14 @@ def create_property(
             address_line=address_line,
             city=city,
             province=province,
-            area_m2=area_m2,
+            title=title,
+            description=description,
             neighborhood=neighborhood,
+            location=location,
+            area_m2=area_m2,
             bedrooms=bedrooms,
             bathrooms=bathrooms,
+            parking_spaces=parking_spaces,
             year_built=year_built,
             youtube_video_url=youtube_video_url,
             owner_contact_id=owner_contact_id,
@@ -97,67 +112,61 @@ def create_property(
 def update_property(
     *,
     property: Property,
-    address_line: str | None = None,
-    city: str | None = None,
-    province: str | None = None,
-    neighborhood: str | None = None,
-    area_m2: Decimal | None = None,
-    bedrooms: int | None = None,
-    bathrooms: int | None = None,
-    year_built: int | None = None,
-    youtube_video_url: str | None = None,
-    features: list[str] | None = None,
-    owner_contact_id: UUID | None = None,
+    title: str = UNSET,
+    description: str = UNSET,
+    address_line: str = UNSET,
+    city: str = UNSET,
+    province: str = UNSET,
+    neighborhood: str = UNSET,
+    location: Point | None = UNSET,
+    area_m2: Decimal | None = UNSET,
+    bedrooms: int | None = UNSET,
+    bathrooms: int | None = UNSET,
+    parking_spaces: int | None = UNSET,
+    year_built: int | None = UNSET,
+    youtube_video_url: str = UNSET,
+    features: list[str] = UNSET,
+    owner_contact_id: UUID | None = UNSET,
     actor: User,
 ) -> Property:
+    """
+    Actualización parcial con sentinela:
+      - UNSET (default) → el campo no se toca.
+      - None / "" / [] → blanquear (semántica de reemplazo desde el form).
+      - valor → set.
+    features: UNSET = no tocar, [] = vaciar, lista de slugs = reemplazo total.
+    is_external NO es editable — la invariante 1:1 con ExternalPropertySource
+    se protege acá por omisión deliberada.
+    """
+    field_values = {
+        "title": title,
+        "description": description,
+        "address_line": address_line,
+        "city": city,
+        "province": province,
+        "neighborhood": neighborhood,
+        "location": location,
+        "area_m2": area_m2,
+        "bedrooms": bedrooms,
+        "bathrooms": bathrooms,
+        "parking_spaces": parking_spaces,
+        "year_built": year_built,
+        "youtube_video_url": youtube_video_url,
+        "owner_contact_id": owner_contact_id,
+    }
+
     update_fields = ["updated_by", "updated_at"]
-
-    if address_line is not None:
-        property.address_line = address_line
-        update_fields.append("address_line")
-
-    if city is not None:
-        property.city = city
-        update_fields.append("city")
-
-    if province is not None:
-        property.province = province
-        update_fields.append("province")
-
-    if neighborhood is not None:
-        property.neighborhood = neighborhood
-        update_fields.append("neighborhood")
-
-    if area_m2 is not None:
-        property.area_m2 = area_m2
-        update_fields.append("area_m2")
-
-    if bedrooms is not None:
-        property.bedrooms = bedrooms
-        update_fields.append("bedrooms")
-
-    if bathrooms is not None:
-        property.bathrooms = bathrooms
-        update_fields.append("bathrooms")
-
-    if year_built is not None:
-        property.year_built = year_built
-        update_fields.append("year_built")
-
-    if youtube_video_url is not None:
-        property.youtube_video_url = youtube_video_url
-        update_fields.append("youtube_video_url")
+    for field, value in field_values.items():
+        if value is not UNSET:
+            setattr(property, field, value)
+            update_fields.append(field)
 
     feature_rows: list[Feature] | None = None
-    if features is not None:
+    if features is not UNSET:
         feature_rows = _resolve_features(features)
 
-    if owner_contact_id is not None:
-        property.owner_contact_id = owner_contact_id
-        update_fields.append("owner_contact_id")
-        
     property.updated_by = actor
-    
+
     with transaction.atomic():
         property.save(update_fields=update_fields)
         if feature_rows is not None:
