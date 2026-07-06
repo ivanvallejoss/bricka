@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from apps.contacts.tests.factories import UserFactory
 from apps.properties.models import Property, ExternalPropertySource, PropertyMedia, Feature
-from apps.properties.choices import PropertyType, PropertyStatus
+from apps.properties.choices import PropertyType, PropertyStatus, FeatureCategory
 
 
 class PropertyFactory(factory.django.DjangoModelFactory):
@@ -47,4 +47,5 @@ class FeatureFactory(factory.django.DjangoModelFactory):
 
     slug = factory.Sequence(lambda n: f"feature_{n}")
     label = factory.LazyAttribute(lambda o: o.slug.replace("_", " ").capitalize())
+    category = FeatureCategory.CARACTERISTICAS
     is_active = True

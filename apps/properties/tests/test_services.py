@@ -275,14 +275,13 @@ class TestPropertyFeatures:
         assert prop.features.count() == 0
 
     def test_create_rejects_unknown_slug(self, db, actor):
-        FeatureFactory(slug="balcon")
         with pytest.raises(PropertyValidationError, match="desconocidas"):
-            self._create(actor, features=["balcon", "pileta"])
+            self._create(actor, features=["balcon", "slug_inexistente"])
 
     def test_create_rejects_inactive_slug(self, db, actor):
-        FeatureFactory(slug="balcon", is_active=False)
+        FeatureFactory(slug="feature_retirada_test", is_active=False)
         with pytest.raises(PropertyValidationError, match="inactivas"):
-            self._create(actor, features=["balcon"])
+            self._create(actor, features=["feature_retirada_test"])
 
     def test_rejection_writes_nothing(self, db, actor):
         with pytest.raises(PropertyValidationError):

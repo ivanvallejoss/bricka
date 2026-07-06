@@ -16,3 +16,10 @@ class PropertyStatus(models.TextChoices):
     RENTED      = "rented"
     SOLD        = "sold"
     UNAVAILABLE = "unavailable"
+
+
+class FeatureCategory(models.TextChoices):
+    GENERAL         = "general", "Características generales"
+    CARACTERISTICAS = "caracteristicas", "Características"
+    SERVICIOS       = "servicios", "Servicios"
+    AMBIENTES       = "ambientes", "Ambientes"

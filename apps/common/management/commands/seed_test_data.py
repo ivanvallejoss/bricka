@@ -260,7 +260,7 @@ class Command(BaseCommand):
             address_line="Justo XII 250, Piso 4, Dpto. B",
             city="Resistencia", neighborhood="Centro", province="Chaco",
             area_m2=Decimal("85.00"), bedrooms=3, bathrooms=2, year_built=2008,
-            features=["balcon", "porteria", "ascensor", "cocina_equipada"],
+            features=["balcon", "encargado", "ascensor", "cocina_equipada"],
             owner_contact_id=owner.pk, actor=actor,
         )
 
@@ -331,7 +331,7 @@ class Command(BaseCommand):
             address_line="Av. 25 de Mayo 1840",
             city="Resistencia", neighborhood="Villa del Parque", province="Chaco",
             area_m2=Decimal("120.00"), bedrooms=3, bathrooms=1, year_built=1998,
-            features=["patio", "garaje", "lavadero"],
+            features=["patio", "lavadero"], # TODO paso2: parkin_spaces=1 (tenia cochera)
             owner_contact_id=owner.pk, actor=actor,
         )
 
@@ -423,7 +423,7 @@ class Command(BaseCommand):
             address_line="España 940, Piso 3, Dpto. A",
             city="Resistencia", neighborhood="Villa España", province="Chaco",
             area_m2=Decimal("52.00"), bedrooms=2, bathrooms=1, year_built=2015,
-            features=["balcon", "cocina_integrada"],
+            features=["balcon", "cocina"],
             owner_contact_id=owner.pk, actor=actor,
         )
         # next_adjustment = start + 3m = today - 10d → days=-10 → danger.
@@ -504,7 +504,7 @@ class Command(BaseCommand):
             address_line="López y Planes 1560",
             city="Resistencia", neighborhood="Barrio Norte", province="Chaco",
             area_m2=Decimal("210.00"), bedrooms=4, bathrooms=2, year_built=2012,
-            features=["quincho", "parrilla", "cochera_doble", "lote_propio"],
+            features=["quincho", "parrilla", "lote_propio"], # TODO paso 2: parking_spaces=2
             owner_contact_id=seller.pk, actor=actor,
         )
 
@@ -575,7 +575,7 @@ class Command(BaseCommand):
             address_line="Güemes 380, Piso 1, Dpto. C",
             city="Resistencia", neighborhood="Güemes", province="Chaco",
             area_m2=Decimal("38.00"), bedrooms=1, bathrooms=1, year_built=2024,
-            features=["a_estrenar", "cocina_americana"],
+            features=["a_estrenar", "cocina"],
             owner_contact_id=owner.pk, actor=actor,
         )
 
@@ -664,7 +664,7 @@ class Command(BaseCommand):
             address_line="Pellegrini 1490",
             city="Resistencia", neighborhood="Villa Forestación", province="Chaco",
             area_m2=Decimal("95.00"), bedrooms=2, bathrooms=1, year_built=2009,
-            features=["patio", "cochera", "cocina_integrada"],
+            features=["patio", "cocina"], # TODO paso 2: parking_spaces=1
             owner_contact_id=owner.pk, actor=actor,
         )
         start_term = today - relativedelta(months=6)
@@ -964,7 +964,7 @@ class Command(BaseCommand):
             address_line="Av. 9 de Julio 540, Piso 6, Dpto. A",
             city="Resistencia", neighborhood="Centro", province="Chaco",
             area_m2=Decimal("54.00"), bedrooms=2, bathrooms=1, year_built=2016,
-            features=["balcon", "luminoso"], owner_contact_id=owner.pk, actor=actor,
+            features=["balcon"], owner_contact_id=owner.pk, actor=actor,
         )
         prop_2 = self._make_property(
             title="Departamento 1 ambiente — Güemes",

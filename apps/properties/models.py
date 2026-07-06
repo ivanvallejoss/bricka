@@ -4,7 +4,7 @@ from django.db import models
 
 from apps.common.models import BaseModel, SoftDeleteModel, TimestampModel
 from apps.common.models import AuditableMixin
-from .choices import PropertyType, PropertyStatus
+from .choices import PropertyType, PropertyStatus, FeatureCategory
 
 
 class Feature(BaseModel):
@@ -19,11 +19,15 @@ class Feature(BaseModel):
       cascada limpiaría silenciosamente features de propiedades existentes.
       is_active=False la saca de formularios sin tocar historia.
 
-    Decisión negativa v1: sin category, icon ni order manual.
-    Se agregan cuando exista un consumidor. Ver docs/decisions.
+    category: agrupación para formularios (el consumidor llegó con la UI de creación). 
+    icon y order manual siguen fuera hasta tener consumidor.
     """
     slug = models.SlugField(max_length=50, unique=True)
     label = models.CharField(max_length=100)
+    category = models.CharField(
+        max_length=20,
+        choices=FeatureCategory.choices,
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
