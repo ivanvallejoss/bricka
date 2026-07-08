@@ -1,0 +1,9 @@
+{% comment %}
+Monto con moneda — patrón único de dinero para BillingDocument.
+Contexto requerido: amount (Decimal), currency ("ARS" | "USD").
+El <p> contenedor lo pone el caller (ahí viven tamaño, peso, color y
+tabular-nums). Alineado al patrón de contracts (_section_active):
+$ + código ISO como sufijo chico. Los renglones de desglose NO lo usan:
+comparten la moneda del documento, que declara el total.
+{% endcomment %}
+ ${{ amount|floatformat:0 }} <span class="text-[11px] font-normal text-on-surface-variant">{{ currency }}</span>

@@ -34,7 +34,7 @@ Contexto requerido: page_obj, search, period_str
                     </p>
                 </div>
                 <p class="text-[15px] font-semibold text-on-surface tabular-nums shrink-0">
-                    ${{ doc.total_amount|floatformat:0 }}
+                    {% include "partials/_money.html" with amount=doc.total_amount currency=doc.currency %}
                 </p>
             </div>
         </div>
@@ -102,7 +102,7 @@ Contexto requerido: page_obj, search, period_str
                 </td>
                 <td class="px-4 py-3 text-right">
                     <p class="text-[13px] font-semibold text-on-surface tabular-nums">
-                        ${{ doc.total_amount|floatformat:0 }}
+                        {% include "partials/_money.html" with amount=doc.total_amount currency=doc.currency %}
                     </p>
                 </td>
             </tr>

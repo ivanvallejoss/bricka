@@ -150,7 +150,7 @@ Contexto requerido: document, enriched_lines
                 <div class="flex items-center justify-between gap-3 pt-1">
                     <p class="text-[13px] font-medium text-on-surface-variant">Total</p>
                     <p class="text-[20px] font-semibold text-on-surface tabular-nums">
-                        ${{ document.total_amount|floatformat:0 }}
+                        {% include "partials/_money.html" with amount=document.total_amount currency=document.currency %}
                     </p>
                 </div>
 
