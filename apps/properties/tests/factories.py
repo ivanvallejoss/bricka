@@ -9,6 +9,19 @@ from apps.properties.choices import PropertyType, PropertyStatus, FeatureCategor
 class PropertyFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Property
+        skip_postgeneration_save = True
+
+    class Params:
+        # Propiedad que satisface el gate de publicación (descripción + foto).
+        # El default de la factory sigue siendo "operable, no publicable" —
+        # el trait se pide explícito donde el test va a publicar.
+        publishable = factory.Trait(
+            description="Descripción de prueba para publicación.",
+            gate_media=factory.RelatedFactory(
+                "apps.properties.tests.factories.PropertyMediaFactory",
+                factory_related_name="property",
+            ),
+        )
 
     property_type = PropertyType.APARTMENT
     address_line = factory.Sequence(lambda n: f"Calle {n} 123")

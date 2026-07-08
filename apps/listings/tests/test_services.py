@@ -8,7 +8,7 @@ from apps.listings.choices import (
     PublicationChannel,
     PublicationStatus,
 )
-from apps.listings.exceptions import ListingValidationError
+from apps.listings.exceptions import ListingValidationError, ListingPublicationRequirementsError
 from apps.listings.models import Listing, ListingPriceHistory
 from apps.listings.services import (
     archive_listing,
@@ -137,7 +137,7 @@ class TestUpdateListingPrice:
 
 class TestUpdateListingStatus:
     def test_updates_status(self, db, actor):
-        listing = ListingFactory(status=ListingStatus.DRAFT)
+        listing = ListingFactory(status=ListingStatus.DRAFT, property__publishable=True)
         update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
         listing.refresh_from_db()
         assert listing.status == ListingStatus.PUBLISHED
@@ -162,7 +162,7 @@ class TestUpdateListingStatus:
             )
 
     def test_allows_activation_when_existing_listing_is_closed(self, db, actor):
-        prop = PropertyFactory()
+        prop = PropertyFactory(publishable=True)
         ListingFactory(
             property=prop,
             operation_type=OperationType.RENT,
@@ -182,7 +182,7 @@ class TestUpdateListingStatus:
         assert new_listing.status == ListingStatus.PUBLISHED
 
     def test_activating_already_active_listing_does_not_raise(self, db, actor):
-        listing = ListingFactory(status=ListingStatus.PUBLISHED)
+        listing = ListingFactory(status=ListingStatus.PUBLISHED, property__publishable=True)
         update_listing_status(
             listing=listing,
             status=ListingStatus.PUBLISHED,
@@ -300,3 +300,38 @@ class TestUpdatePublicationStatus:
         )
         publication.refresh_from_db()
         assert publication.external_id == "ZP-12345"
+
+
+class TestPublicationGate:
+    def test_publishes_complete_property(self, db, actor):
+        listing = ListingFactory(status=ListingStatus.DRAFT, property__publishable=True)
+        update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.PUBLISHED
+
+    def test_rejects_blank_description(self, db, actor):
+        prop = PropertyFactory(publishable=True, description="   ")
+        listing = ListingFactory(property=prop, status=ListingStatus.DRAFT)
+        with pytest.raises(ListingPublicationRequirementsError) as exc:
+            update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
+        assert exc.value.missing == ["description"]
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.DRAFT
+
+    def test_rejects_without_photos(self, db, actor):
+        prop = PropertyFactory(description="Completa y publicable.")
+        listing = ListingFactory(property=prop, status=ListingStatus.DRAFT)
+        with pytest.raises(ListingPublicationRequirementsError) as exc:
+            update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
+        assert exc.value.missing == ["photos"]
+
+    def test_missing_accumulates_all_requirements(self, db, actor):
+        listing = ListingFactory(status=ListingStatus.DRAFT)  # propiedad pelada
+        with pytest.raises(ListingPublicationRequirementsError) as exc:
+            update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
+        assert exc.value.missing == ["description", "photos"]
+
+    def test_gate_error_is_a_validation_error(self, db, actor):
+        listing = ListingFactory(status=ListingStatus.DRAFT)
+        with pytest.raises(ListingValidationError):
+            update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)

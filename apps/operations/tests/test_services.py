@@ -13,6 +13,7 @@ from apps.properties.choices import PropertyStatus
 from apps.properties.tests.factories import PropertyFactory
 from apps.listings.choices import ListingStatus, OperationType, PublicationStatus
 from apps.listings.models import Listing, ListingPublication
+from apps.listings.exceptions import ListingPublicationRequirementsError
 from apps.listings.tests.factories import ListingFactory, ListingPublicationFactory
 
 
@@ -183,7 +184,7 @@ class TestTransitionToUnavailable:
 
 class TestTransitionToAvailable:
     def test_unpauses_paused_listing(self, db, actor):
-        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE, publishable=True)
         rent = ListingFactory(
             property=prop,
             operation_type=OperationType.RENT,
@@ -299,7 +300,7 @@ class TestWithdrawProperty:
 
 class TestRestoreProperty:
     def test_unavailable_to_available_unpauses_listings(self, db, actor):
-        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE, publishable=True)
         rent = ListingFactory(
             property=prop,
             operation_type=OperationType.RENT,
@@ -314,6 +315,22 @@ class TestRestoreProperty:
         prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
         with pytest.raises(InvalidPropertyTransition):
             restore_property(property=prop, actor=actor)
+    
+    def test_restore_propagates_gate_rejection_and_rolls_back(self, db, actor):
+        # Decisión A1 (ver ADR): el gate intercepta el unpause del orquestador.
+        # El rechazo propaga y la transacción revierte ENTERA: la propiedad
+        # sigue UNAVAILABLE, el listing sigue PAUSED. "Completala primero".
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)  # incompleta
+        rent = ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PAUSED,
+        )
+        with pytest.raises(ListingPublicationRequirementsError):
+            restore_property(property=prop, actor=actor)
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.UNAVAILABLE
+        assert _status(rent) == ListingStatus.PAUSED
 
 
 class TestRemandateProperty:
@@ -330,7 +347,7 @@ class TestRemandateProperty:
     def test_revives_paused_rent_leaves_closed_sale(self, db, actor):
         # el flujo inversor: el alquiler parkeado revive, la venta concretada
         # queda como historia (no se resucita).
-        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        prop = PropertyFactory(status=PropertyStatus.SOLD, publishable=True)
         buyer = ContactFactory()
         rent = ListingFactory(
             property=prop,

@@ -4,9 +4,9 @@ from django.utils import timezone
 from django.db import transaction
 
 from apps.users.models import User
-from apps.listings.choices import ListingStatus, OperationType, PublicationStatus
-from apps.listings.exceptions import ListingValidationError
-from apps.listings.models import Listing, ListingPriceHistory, ListingPublication
+from .choices import ListingStatus, OperationType, PublicationStatus
+from .exceptions import ListingValidationError, ListingPublicationRequirementsError
+from .models import Listing, ListingPriceHistory, ListingPublication
 from apps.properties.models import Property
 
 
@@ -82,6 +82,25 @@ def update_listing_price(
     return listing
 
 
+def _publication_requirements_missing(property: Property) -> list[str]:
+    """
+    Gate de publicación (contrato: Decisión 3 de la vertical properties;
+    la implementación vive acá porque publicar es un acto del listing).
+    Invariante: nada incompleto llega a estado público.
+
+    v1: descripción no vacía + al menos una foto.
+    - area_m2 queda FUERA a propósito: un gate uniforme bloquearía
+      publicar una cochera sin m². Extensión futura por property_type.
+    - price no se chequea: create_listing lo exige y el modelo es NOT NULL.
+    """
+    missing = []
+    if not property.description.strip():
+        missing.append("description")
+    if not property.media.exists():
+        missing.append("photos")
+    return missing
+
+
 def update_listing_status(
     *,
     listing: Listing,
@@ -101,6 +120,10 @@ def update_listing_status(
                 f"Ya existe un listing activo de tipo "
                 f"'{listing.operation_type}' para esta propiedad."
             )
+            
+        missing = _publication_requirements_missing(listing.property)
+        if missing:
+            raise ListingPublicationRequirementsError(missing)
 
     listing.status = status
     listing.updated_by = actor
