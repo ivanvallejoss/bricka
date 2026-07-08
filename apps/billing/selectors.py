@@ -8,7 +8,6 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 
 from apps.contracts.choices import ContractStatus
-from apps.deals.choices import DealType
 
 from .choices import DocumentStatus, DocumentType, PaymentStatus
 from .models import BillingDocument
@@ -18,16 +17,17 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from apps.contracts.models import RentalContract # Import solo a modo de type hint
 
-# Cobros base: recibos contract-based (siempre con period).
-# COMMISSION_RECEIPT se suma aparte en get_cobros, condicionado a
-# deal_type=SALE. Las comisiones de alquiler quedan fuera hasta que deals/
-# tenga punto de emisión propio — siguen sin superficie de listado
-# (deuda técnica parcial pendiente).
+# Cobros = todo documento cuyo dinero ENTRA a la agencia: recibos
+# periódicos contract-based (siempre con period) + comisiones (por
+# operación, SIN period — bajo filtro de mes no aparecen; comportamiento
+# aceptado, ver gap #3 de docs/decisions/seed-data.md). La condición
+# deal_type=SALE se eliminó en S5 (b5): una comisión de alquiler es un
+# cobro igual que una de venta. Salda el gap #1 de seed-data.md.
 _COBROS_TYPES = {
     DocumentType.RENT_RECEIPT,
     DocumentType.EXPENSE_RECEIPT,
+    DocumentType.COMMISSION_RECEIPT,
 }
-
 
 def get_cobros(
     *,
@@ -38,14 +38,14 @@ def get_cobros(
 ):
     qs = (
         BillingDocument.objects
-        .filter(
-            Q(document_type__in=_COBROS_TYPES)
-            | Q(
-                document_type=DocumentType.COMMISSION_RECEIPT,
-                deal__deal_type=DealType.SALE,
-            )
+        .filter(document_type__in=_COBROS_TYPES)
+        .select_related(
+            "contract",
+            "contract__property",
+            "deal",
+            "deal__listing",
+            "deal__listing__property",
         )
-        .select_related("contract", "contract__property")
         .order_by("-date", "-number")
     )
     if period:

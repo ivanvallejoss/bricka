@@ -31,6 +31,14 @@ Contexto requerido: page_obj, search, period_str
                     <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
                         {{ doc.contract.property.title|default:doc.contract.property.address_line }}
                     </p>
+                    {% elif doc.deal.listing %}
+                    <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+                        {{ doc.deal.listing.property.title|default:doc.deal.listing.property.address_line }}
+                    </p>
+                    {% elif doc.deal.external_property_notes %}
+                    <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+                        {{ doc.deal.external_property_notes }}
+                    </p>
                     {% endif %}
                     <p class="text-[11px] text-on-surface-variant tabular-nums mt-0.5">
                         {{ doc.get_document_type_display }}
@@ -97,6 +105,14 @@ Contexto requerido: page_obj, search, period_str
                     {% if doc.contract %}
                     <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
                         {{ doc.contract.property.title|default:doc.contract.property.address_line }}
+                    </p>
+                    {% elif doc.deal.listing %}
+                    <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+                        {{ doc.deal.listing.property.title|default:doc.deal.listing.property.address_line }}
+                    </p>
+                    {% elif doc.deal.external_property_notes %}
+                    <p class="text-[11px] text-on-surface-variant truncate mt-0.5">
+                        {{ doc.deal.external_property_notes }}
                     </p>
                     {% endif %}
                 </td>

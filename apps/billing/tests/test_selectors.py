@@ -3,10 +3,12 @@ from datetime import date
 import pytest
 
 from apps.billing.choices import DocumentStatus, DocumentType, PaymentStatus
-from apps.billing.selectors import get_rental_payment_status
+from apps.billing.selectors import get_cobros, get_rental_payment_status
 from apps.billing.tests.factories import BillingDocumentFactory
 from apps.contracts.choices import ContractStatus
 from apps.contracts.tests.factories import RentalContractFactory
+from apps.deals.choices import DealType
+from apps.deals.tests.factories import DealFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -73,3 +75,91 @@ class TestRentalPaymentStatus:
 
     def test_empty_input_returns_empty_dict(self):
         assert get_rental_payment_status([], as_of=date(2026, 6, 15)) == {}
+
+
+class TestGetCobros:
+    """Cobertura estrenada en S5 (b5) — get_cobros no tenía tests.
+    Fija también el comportamiento preexistente (comisiones de venta,
+    exclusión de rendiciones) que nunca se había pinneado.
+    """
+
+    def test_get_cobros_includes_rent_and_expense_receipts(self):
+        rent = BillingDocumentFactory(document_type=DocumentType.RENT_RECEIPT)
+        expense = BillingDocumentFactory(document_type=DocumentType.EXPENSE_RECEIPT)
+
+        ids = {doc.pk for doc in get_cobros().object_list}
+
+        assert rent.pk in ids
+        assert expense.pk in ids
+
+    def test_get_cobros_includes_sale_commission_receipts(self):
+        doc = BillingDocumentFactory(
+            document_type=DocumentType.COMMISSION_RECEIPT,
+            period=None,
+            deal=DealFactory(deal_type=DealType.SALE),
+        )
+
+        ids = {d.pk for d in get_cobros().object_list}
+
+        assert doc.pk in ids
+
+    def test_get_cobros_includes_rent_commission_receipts(self):
+        """b5 (S5): la condición deal_type=SALE se eliminó — una comisión
+        de alquiler es un cobro igual que una de venta. Cubre también el
+        caso retroactivo: documentos emitidos ANTES del cambio aparecen
+        porque es filtro de lectura, sin migración."""
+        doc = BillingDocumentFactory(
+            document_type=DocumentType.COMMISSION_RECEIPT,
+            period=None,
+            deal=DealFactory(deal_type=DealType.RENT),
+        )
+
+        ids = {d.pk for d in get_cobros().object_list}
+
+        assert doc.pk in ids
+
+    def test_get_cobros_excludes_owner_statements(self):
+        doc = BillingDocumentFactory(
+            document_type=DocumentType.OWNER_STATEMENT,
+        )
+
+        ids = {d.pk for d in get_cobros().object_list}
+
+        assert doc.pk not in ids
+
+    def test_get_cobros_period_filter_excludes_documents_without_period(self):
+        """Gap #3 de seed-data.md, ACEPTADO como intencional: las comisiones
+        no tienen period (son por operación, no periódicas) y bajo filtro
+        de mes no aparecen. Si este test rompe, alguien cambió esa decisión —
+        verificar que haya sido a propósito y actualizar seed-data.md."""
+        from datetime import date as date_cls
+
+        rent = BillingDocumentFactory(
+            document_type=DocumentType.RENT_RECEIPT,
+            period=date_cls(2026, 6, 1),
+        )
+        commission = BillingDocumentFactory(
+            document_type=DocumentType.COMMISSION_RECEIPT,
+            period=None,
+            deal=DealFactory(deal_type=DealType.RENT),
+        )
+
+        ids = {d.pk for d in get_cobros(period=date_cls(2026, 6, 15)).object_list}
+
+        assert rent.pk in ids
+        assert commission.pk not in ids
+
+    def test_get_cobros_search_matches_recipient_name(self):
+        match = BillingDocumentFactory(
+            document_type=DocumentType.RENT_RECEIPT,
+            recipient_name="Carolina Ojeda",
+        )
+        no_match = BillingDocumentFactory(
+            document_type=DocumentType.RENT_RECEIPT,
+            recipient_name="Eduardo Maidana",
+        )
+
+        ids = {d.pk for d in get_cobros(search="carolina").object_list}
+
+        assert match.pk in ids
+        assert no_match.pk not in ids
