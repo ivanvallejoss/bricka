@@ -40,6 +40,12 @@
                             {{ property.address_line }}
                         </p>
                     {% endif %}
+                    {% if property.is_external %}
+                        <span class="inline-block mt-1.5 px-2 py-0.5 rounded-full text-[12px] font-medium
+                              {% if cover_url %}border border-white/60 text-white/90{% else %}border border-outline text-on-surface-variant{% endif %}">
+                            Externa
+                        </span>
+                    {% endif %}
                 </div>
             </div>
 

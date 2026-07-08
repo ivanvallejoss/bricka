@@ -182,6 +182,14 @@ Todo carga inmediata. property y listings ya vienen resueltos desde property_det
             </div>
             {% endif %}
 
+            {% if property.is_external %}
+            <div class="min-w-0">
+                <p class="text-sm font-medium text-on-surface truncate">{{ property.external_source.agency_name }}</p>
+                <p class="text-[11px] text-on-surface-variant mb-1.5">Inmobiliaria externa</p>
+                
+            </div>
+            {% endif %}
+
             {% if active_contract %}
             <div class="flex items-start gap-3 pt-3 border-t border-outline"  >
                 <div class="w-9 h-9 rounded-full bg-primary-container/10 flex items-center justify-center shrink-0 mt-0.5">

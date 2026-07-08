@@ -57,6 +57,9 @@
                     {% elif property.status == 'unavailable' %}
                         <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-surface-container text-on-surface-variant">No disponible</span>
                     {% endif %}
+                    {% if property.is_external %}
+                        <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium border border-outline text-on-surface-variant">( Externa )</span>
+                    {% endif %}
                     {% if ctx.contextual_badge %}
                         {% with badge=ctx.contextual_badge %}
                             <span class="px-1.5 py-0.5 rounded-full text-[12px] font-medium
@@ -95,6 +98,11 @@
                     {% endif %}
                     
                     {# Badge 2 — Contextual (computado por selector.py) #}
+                    {% if property.is_external %}
+                        <span class="px-2 py-0.5 rounded-full text-[12px] font-medium border border-outline text-on-surface-variant">
+                            ( Externa )
+                        </span>
+                    {% endif %}
                     {% if ctx.contextual_badge %}
                         {% with badge=ctx.contextual_badge %}
                             <span class="px-2 py-0.5 rounded-full text-[12px] font-small
