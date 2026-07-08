@@ -32,10 +32,10 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 
 | # | Ítem | Versión |
 | --- | --- | --- |
-| b1 | `close_deal` WON deja el listing PUBLISHED (seed #7) — coherencia de dominio, el gap operativo más caro | V1 ola 1 (S4) |
+| ~~b1~~ | ~~`close_deal` WON deja el listing PUBLISHED (seed #7)~~ — **RESUELTO**: `close_deal` delega en `operations` (`settle_won_sale` para SALE, `transition_property_status(RENTED)` para RENT; el listing de alquiler se PAUSA, RENTED precede a SOLD). Ver ADR "Coordinación de estado cruzado". Lo vivo pasa a b12 | — |
 | ~~b2~~ | ~~`create_property` sin title/description/location~~ — **RESUELTO** en la sesión de Decisión 3; `seed-data.md` quedó desactualizado (ver §5, diff) | — |
 | b3 | Observabilidad: fase 1 NO está en `main` (sentry-sdk 1.40.0 EOL, init inline sin `before_send`). Fase 2 (logging estructurado) decidida sin implementar | F1 → V1 ola 1 (S9) · F2 → V1.1 |
-| b4 | `PropertyStatus.UNAVAILABLE` sin camino de service (seed #6) | V1 ola 1 (S4) |
+| ~~b4~~ | ~~`PropertyStatus.UNAVAILABLE` sin camino de service (seed #6)~~ — **RESUELTO**: `withdraw_property` (AVAILABLE→UNAVAILABLE, docstring "Cierra el gap #6") + `restore_property`, con 28 tests en `operations/tests/`. Lo vivo pasa a b12 | — |
 | b5 | Comisiones de alquiler sin superficie en cobros (seed #1) — negocio venta-céntrico pero con alquileres en administración | V1 ola 1 (S5) |
 | b6 | `$` hardcodeado en template de cobros, sin distinguir moneda (seed #2) | V1 ola 1 (S5) |
 | b7 | Deudas de `last-adr.md`: atributos con valor (8 enums/columnas), vocabulario por tipo de propiedad, A2 (restore parcial) | V2 (por diseño: se activan cuando el uso lo pida). Edición de externas: V1, dentro de S2/S3 |
@@ -43,6 +43,7 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 | b9 | Logo de agencia: `r2_key` sin modelo de configuración | V1.1 |
 | b10 | Testing pendiente histórico (ContactForm.clean, signals audit before/after, views HTMX) + `storage.py` sin tests | Tests de cada track dentro del track; cola histórica → V1.1 |
 | b11 | Numeración de billing incompatible AFIP (gaps por `nextval()`) | V2 — decisión explícita: V1 entrega comprobantes internos no fiscales |
+| b12 | **Superficie de operaciones de propiedad** (sustituye a b1/b4): ninguna view llama `withdraw_property` / `restore_property` — retirar/reactivar no se puede hacer desde el backoffice; y el listing de alquiler que queda PAUSED tras una venta (`settle_won_sale`) no tiene señal visible para el agente. Alcance de UI, no de coherencia de dominio | V1 ola 1 (S4 redefinida) |
 
 ### (c) — Solo en la lista: a registrar
 
@@ -79,9 +80,9 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 ### V1 — ola 1: interno operable → HITO "socios testeando"
 
 Auth (a8) · Track R2/media (a1) · UI creación/edición (a2, b8, edición de
-externas) · Coherencia de dominio (b1, b4) · Billing operativo (b6, b5,
-comprobante PDF de c4) · Vista comercial (c2) · Home mínima (c3 reducida) ·
-Observabilidad fase 1 (b3) · Puesta en producción.
+externas) · Superficie de operaciones de propiedad (b12) · Billing operativo
+(b6, b5, comprobante PDF de c4) · Vista comercial (c2) · Home mínima (c3
+reducida) · Observabilidad fase 1 (b3) · Puesta en producción.
 
 ### V1 — ola 2: portales → HITO "entrega completa"
 
@@ -113,7 +114,7 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 | S1 | Track R2/media: reconciliar duplicados de `storage.py`, verificar wiring, sembrar `PropertyMedia` en seed (resuelve el rojo deliberado), tests | Implementación | Buckets dev creados (infra) | Cerradas (ADRs en `adr-design.md`). Nueva: qué función de cada par duplicado sobrevive |
 | S2 | Diseño UI creación/edición: re-derivar y commitear espec de Decisión 4 (salda b8); upload (orden/portada/validaciones), captura de location, edición de externas, ¿thumbnails? | Diseño | ADRs de S1 (puede solaparse con S1) | Las produce esta sesión |
 | S3 | Implementación UI creación/edición | Implementación | S1 + S2 | Las de S2 |
-| S4 | Coherencia de dominio: b1 (`close_deal`↔listing) + b4 (`UNAVAILABLE`) | Diseño + implementación (ventana única, alcance chico) | — | Faltan; direcciones planteadas en `seed-data.md` |
+| S4 | Superficie de operaciones de propiedad (b12): acciones retirar/reactivar en el detail (llaman `withdraw_property`/`restore_property`) + señal visible del listing de alquiler PAUSED post-venta | Mini diseño + implementación (ventana única) | Post-S3 (hereda patrones del detail); las decisiones de superficie pueden adelantarse a S2 si conviene | Backend cerrado y testeado; falta solo la decisión de presentación |
 | S5 | Billing operativo: b6 (moneda por fila), comprobante PDF, b5 (comisiones de alquiler en cobros) | Diseño corto + implementación | — | Falta: librería/layout PDF, dónde viven comisiones de alquiler |
 | S6 | Vista comercial del detail (c2) | Diseño (relevar con el socio) → implementación | Post-S3 (hereda patrones) | Faltan; insumo = feedback del socio |
 | S7 | Home mínima: contratos por vencer (query request-time) + accesos | Implementación con mini-diseño | Vistas previas (consistencia) | Casi cerradas por reducción de alcance |
@@ -153,10 +154,23 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 
 ## 5. Enmiendas documentales pendientes de commit
 
-**`docs/decisions/seed-data.md`** — gap #4: marcar como RESUELTO. La firma
-de `create_property` expone `title`, `description` y `location` desde la
-sesión de Decisión 3 (umbral operable vs. publicable; el gate de publicación
-concentra la completitud). Referencia: `last-adr.md`.
+**`docs/decisions/seed-data.md`** — tres filas quedaron desactualizadas
+respecto del código; marcarlas RESUELTO con referencia:
+
+- **Gap #4**: la firma de `create_property` expone `title`, `description` y
+  `location` desde la sesión de Decisión 3 (umbral operable vs. publicable).
+  Ref: `last-adr.md`.
+- **Gap #6**: `withdraw_property` / `restore_property` en
+  `operations/services.py` dan camino de service a UNAVAILABLE.
+  Ref: ADR de operations. Superficie de UI pendiente → roadmap b12/S4.
+- **Gap #7**: `close_deal` coordina vía `settle_won_sale` /
+  `transition_property_status`; el listing de venta se cierra siempre, el de
+  alquiler se pausa. Ref: ADR "Coordinación de estado cruzado". Señal visible
+  del PAUSED pendiente → roadmap b12/S4.
+
+**Nota de método para futuras reconciliaciones:** las tablas de severidad de
+`seed-data.md` son una foto de su sesión, no estado vivo. Todo gap listado
+ahí se cruza contra services y ADRs antes de darlo por abierto.
 
 ---
 
@@ -173,4 +187,8 @@ concentra la completitud). Referencia: `last-adr.md`.
   negocio: venta-céntrico pero con alquileres en administración activa.
 - **2026-07-08** — V1 entrega comprobantes internos no fiscales; AFIP (b11)
   explícitamente diferido a V2.
-  
+- **2026-07-08 (enmienda 1)** — b1 y b4 verificados como ya resueltos en
+  `main` (corrección aportada por la ventana orquestadora, verificada acá
+  contra el código). S4 se redefine de "coherencia de dominio" a "superficie
+  de operaciones de propiedad" (b12) y pasa a depender de S3. `seed-data.md`
+  suma dos filas al diff documental.
