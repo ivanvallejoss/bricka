@@ -75,6 +75,7 @@ def get_property_preview(property_id: UUID) -> Property:
         return (
             Property.objects
             .prefetch_related(
+                "features",
                 Prefetch(
                     "media",
                     queryset=PropertyMedia.objects.filter(is_cover=True),
@@ -100,8 +101,9 @@ def get_property_detail(property_id: UUID) -> Property:
     try:
         return (
             Property.objects
-            .select_related("owner_contact")
+            .select_related("owner_contact", "external_source")
             .prefetch_related(
+                "features",
                 Prefetch(
                     "media",
                     queryset=PropertyMedia.objects.order_by("order"),

@@ -14,7 +14,7 @@ from apps.properties.selectors import (
     get_property_media,
     get_property_preview,
 )
-from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory
+from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory, FeatureFactory
 
 
 class TestGetPropertyList:
@@ -177,3 +177,21 @@ class TestGetPropertyMedia:
     def test_returns_empty_queryset_if_no_media(self, db):
         prop = PropertyFactory()
         assert get_property_media(prop.pk).count() == 0
+
+
+class TestFeaturePrefetch:
+    def test_detail_prefetches_features(self, db, django_assert_num_queries):
+        prop = PropertyFactory()
+        prop.features.set([FeatureFactory(slug="balcon"), FeatureFactory(slug="patio")])
+        detail = get_property_detail(prop.pk)
+        with django_assert_num_queries(0):
+            labels = [f.label for f in detail.features.all()]
+        assert len(labels) == 2
+
+    def test_preview_prefetches_features(self, db, django_assert_num_queries):
+        prop = PropertyFactory()
+        prop.features.set([FeatureFactory(slug="balcon")])
+        preview = get_property_preview(prop.pk)
+        with django_assert_num_queries(0):
+            slugs = [f.slug for f in preview.features.all()]
+        assert slugs == ["balcon"]
