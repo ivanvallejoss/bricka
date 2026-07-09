@@ -136,6 +136,20 @@ R2_PUBLIC_MEDIA_BUCKET   = env.str("R2_PUBLIC_MEDIA_BUCKET")    # bricka-media-d
 R2_PRIVATE_DOCS_BUCKET   = env.str("R2_PRIVATE_DOCS_BUCKET")    # bricka-documents-dev / bricka-documents
 R2_PUBLIC_MEDIA_BASE_URL = env.str("R2_PUBLIC_MEDIA_BASE_URL")
 
+# ── Datos de la agencia ─────────────────────────────────────────────
+# Consumidos por el comprobante PDF (apps/billing/pdf.py). Van por env
+# y NO hardcodeados: el repo es público — CUIT/teléfono/dirección
+# reales viven en .env (dev) y en el .env del deploy (prod), mismo
+# patrón que R2_*. b9 (V1.1) trae el modelo de configuración de agencia
+# (logo); estos campos pueden migrar ahí si el socio necesita editarlos.
+AGENCY_NAME    = env.str("AGENCY_NAME", default="Inmobiliaria")
+AGENCY_CUIT    = env.str("AGENCY_CUIT", default="")
+AGENCY_ADDRESS = env.str("AGENCY_ADDRESS", default="")
+AGENCY_PHONE   = env.str("AGENCY_PHONE", default="")
+AGENCY_EMAIL   = env.str("AGENCY_EMAIL", default="")
+
+
+
 # Static
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
