@@ -13,6 +13,7 @@ from .choices import ConceptLineType, DocumentType
 from .concept import ConceptLine
 from .exceptions import BillingBusinessError, CannotCancelDocument, InvalidConceptLine
 from .display import enrich_lines_for_display, month_label
+from .pdf import document_pdf_filename, render_document_pdf
 from .selectors import get_billing_document, get_cobros, get_pagos
 from .services import cancel_billing_document, create_billing_document
 
@@ -205,6 +206,19 @@ def document_cancel(request, document_id):
             reverse("contracts:detail", kwargs={"contract_id": str(document.contract.pk)})
         )
     return redirect(reverse("billing:list"))
+
+
+def document_pdf(request, document_id):
+    try:
+        document = get_billing_document(document_id)
+    except ObjectDoesNotExist:
+        raise Http404
+
+    response = HttpResponse(render_document_pdf(document), content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="{document_pdf_filename(document)}"'
+    )
+    return response
 
 
 def billing_list(request):

@@ -18,8 +18,9 @@ urlpatterns = [
         views.emit_form,
         name="emit-form",
     ),
-
+    
     # Comprobante individual
     path("<uuid:document_id>/", views.document_detail, name="detail"),
     path("<uuid:document_id>/cancel/", views.document_cancel, name="cancel"),
+    path("<uuid:document_id>/pdf/", views.document_pdf, name="pdf"),
 ]

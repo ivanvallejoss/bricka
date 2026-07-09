@@ -176,6 +176,9 @@ def get_billing_document(document_id: UUID) -> BillingDocument:
         .select_related(
             "contract",
             "contract__property",
+            "deal",
+            "deal__listing",
+            "deal__listing__property",
             "recipient_contact",
             "created_by",
         )
