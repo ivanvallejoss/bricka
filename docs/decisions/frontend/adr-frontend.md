@@ -7,6 +7,7 @@ Cada entrada: contexto, decisión y trade-off aceptado.
 ### Stack de frontend — librerías y versiones
 
 **Decisión:** Django Templates + HTMX 2.0.4 + Alpine.js 3.14.9 + Tailwind v4
+
 + Flowbite v3 (CDN 3.1.2).
 
 **Integración HTMX:** vía `django-htmx`. Setup:
@@ -155,10 +156,10 @@ fuerza una reevaluación del observer.
 
 **Regla resultante:**
 
-- `hx-trigger="load"` — en `property_detail.html` y cualquier página donde
++ `hx-trigger="load"` — en `property_detail.html` y cualquier página donde
   el scroll ocurre dentro de `<main class="overflow-y-auto">`. El elemento
   está técnicamente visible desde el principio para el observer.
-- `hx-trigger="revealed"` — en el slide-over y en contenedores con scroll
++ `hx-trigger="revealed"` — en el slide-over y en contenedores con scroll
   propio donde el panel es más pequeño que el viewport. Los elementos debajo
   del fold del panel realmente están fuera del viewport visible.
 
@@ -334,8 +335,8 @@ en mobile, usar dos layouts explícitos:
 
 El sentinel de infinite scroll va dentro de cada layout:
 
-- Mobile: `hx-target="closest .divide-y"` + `hx-swap="beforeend"`
-- Desktop: `hx-target="closest tbody"` + `hx-swap="beforeend"`
++ Mobile: `hx-target="closest .divide-y"` + `hx-swap="beforeend"`
++ Desktop: `hx-target="closest tbody"` + `hx-swap="beforeend"`
 
 **Justificación:** dos layouts explícitos son más predecibles que depender del
 colapso de columnas con `w-0`, cuyo comportamiento varía entre browsers.
@@ -372,7 +373,7 @@ el observer funciona correctamente.
 
 **Estructura del panel:**
 
-```
+``` mermaid
 ┌─ Header con cover de fondo (shrink-0) ──────┐
 │  Zona 1: imagen cover + título               │
 │  Zona 2: badges + precio                     │
@@ -401,9 +402,9 @@ window.innerWidth >= 768
 **Decisión:** el modal genérico (creación, edición) vive en `#modal-container`.
 Flujo completo:
 
-- `GET` → view devuelve HTML del modal → HTMX inyecta en `#modal-container`
-- `POST` éxito → `HX-Redirect` → reload completo; modal desaparece
-- `POST` error → view re-renderiza modal con errores inline → HTMX reemplaza
++ `GET` → view devuelve HTML del modal → HTMX inyecta en `#modal-container`
++ `POST` éxito → `HX-Redirect` → reload completo; modal desaparece
++ `POST` error → view re-renderiza modal con errores inline → HTMX reemplaza
   `#modal-container`
 
 El shell Alpine limpia el container al cerrar (delay 200ms):
@@ -443,7 +444,7 @@ hace swap vía HTMX contra un `id` interno:
 
 URLs del two-step:
 
-```
+``` python
 GET  /backoffice/billing/emit/<contract_id>/              → step 1 (shell + step 1)
 GET  /backoffice/billing/emit/<contract_id>/<doc_type>/   → step 2 (solo contenido)
 POST /backoffice/billing/emit/<contract_id>/<doc_type>/   → procesamiento
@@ -527,7 +528,7 @@ la misma row sin confundir el estado de la propiedad con el estado de cobro.
 **Decisión:** para FK de alto volumen en formularios, el combobox tiene esta
 arquitectura:
 
-```
+``` python
 [Input texto visible]  →  hx-get="/backoffice/<app>/search/?q=..."
                           hx-trigger="input changed delay:300ms"
                           hx-target="#<field>-results"
@@ -726,7 +727,7 @@ listings, solo cambia `listings/selectors.py`.
 **Decisión:** el precio a mostrar depende del estado de la propiedad:
 
 | Estado | Fuente | Campo |
-|--------|--------|-------|
+| -------- | -------- | ------- |
 | `rented` | Contrato activo | `active_contract.current_price` |
 | Cualquier otro | Listings activos | `listing.price` |
 
@@ -792,9 +793,9 @@ vez al cargar el módulo.
 **Decisión:** `billing/` no tiene un dashboard de estado que detecte pendientes
 para todos los contratos. Los puntos de entrada son contextuales por vertical:
 
-- `contract_detail` → `RENT_RECEIPT`, `EXPENSE_RECEIPT`, `OWNER_STATEMENT`
-- `deal_detail` → `COMMISSION_RECEIPT` (cuando `deals/` tenga URLs activas)
-- `contact_detail` → `OWNER_STATEMENT` (futuro)
++ `contract_detail` → `RENT_RECEIPT`, `EXPENSE_RECEIPT`, `OWNER_STATEMENT`
++ `deal_detail` → `COMMISSION_RECEIPT` (cuando `deals/` tenga URLs activas)
++ `contact_detail` → `OWNER_STATEMENT` (futuro)
 
 La vista global `/backoffice/billing/` es historial de consulta — todos los
 comprobantes emitidos, sin límite, sin detección de pendientes. Organizada por
@@ -832,7 +833,7 @@ reverse("contact-list")            # incorrecto si app_name está declarado
 **Estado al cierre de sesión 5 → corregido:**
 
 | App | `app_name` |
-|-----|------------|
+| ----- | ------------ |
 | `properties` | ✅ `"properties"` |
 | `contacts` | ✅ `"contacts"` |
 | `contracts` | ✅ `"contracts"` — ~~era deuda de sesión 4~~ RESUELTO |
@@ -888,6 +889,7 @@ Alpine inicializa su scope al cargar; el partial HTMX llega después y Alpine no
 re-evalúa los listeners de los elementos nuevos.
 
 **Solución robusta:** `onclick` nativo en el partial + `window.dispatchEvent`
+
 + escucha con `@evento.window` en el componente Alpine estático:
 
 ```javascript

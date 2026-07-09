@@ -24,6 +24,7 @@ listing del deal → `external_property_notes`. `get_cobros` estrenó cobertura:
 6 tests, incluido el que fija el gap #3 como intencional.
 
 **Comprobante PDF (c4).**
+
 - *Tipos:* los cuatro `document_type`, template compartido — el layout es el
   mismo y el costo marginal de restringir era mayor que el de incluir.
 - *Librería:* WeasyPrint 69.0. HTML→PDF desde templates de Django (el idioma

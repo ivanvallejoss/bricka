@@ -4,7 +4,7 @@ Documento vivo de la ventana de planificación. Criterio rector: ENTREGA —
 prioriza lo que el socio necesita pulido y estable para operar. Relegar un
 ítem a V1.1/V2 es una decisión escrita, no un olvido.
 
-**Última actualización:** 2026-07-08
+**Última actualización:** 2026-07-09 (enmienda 2 — cierre de S5)
 **Base verificada:** `main` como única fuente de verdad (todo commiteado
 salvo `.env`).
 
@@ -36,11 +36,11 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 | ~~b2~~ | ~~`create_property` sin title/description/location~~ — **RESUELTO** en la sesión de Decisión 3; `seed-data.md` quedó desactualizado (ver §5, diff) | — |
 | b3 | Observabilidad: fase 1 NO está en `main` (sentry-sdk 1.40.0 EOL, init inline sin `before_send`). Fase 2 (logging estructurado) decidida sin implementar | F1 → V1 ola 1 (S9) · F2 → V1.1 |
 | ~~b4~~ | ~~`PropertyStatus.UNAVAILABLE` sin camino de service (seed #6)~~ — **RESUELTO**: `withdraw_property` (AVAILABLE→UNAVAILABLE, docstring "Cierra el gap #6") + `restore_property`, con 28 tests en `operations/tests/`. Lo vivo pasa a b12 | — |
-| b5 | Comisiones de alquiler sin superficie en cobros (seed #1) — negocio venta-céntrico pero con alquileres en administración | V1 ola 1 (S5) |
-| b6 | `$` hardcodeado en template de cobros, sin distinguir moneda (seed #2) | V1 ola 1 (S5) |
+| ~~b5~~ | ~~Comisiones de alquiler sin superficie en cobros (seed #1)~~ — **RESUELTO en S5**: filtro `deal_type=SALE` eliminado de `get_cobros`; toda `COMMISSION_RECEIPT` es un cobro, con propiedad por fila (contrato → listing del deal → notas de externa). Retroactivo sin migración. 6 tests. Ver `s5-billing-operativo.md` | — |
+| ~~b6~~ | ~~`$` hardcodeado en template de cobros, sin distinguir moneda (seed #2)~~ — **RESUELTO en S5**: partial `partials/_money.html` ($ + código ISO), aplicado a los 9 puntos que renderizan `total_amount`. Ver `s5-billing-operativo.md` | — |
 | b7 | Deudas de `last-adr.md`: atributos con valor (8 enums/columnas), vocabulario por tipo de propiedad, A2 (restore parcial) | V2 (por diseño: se activan cuando el uso lo pida). Edición de externas: V1, dentro de S2/S3 |
 | b8 | Documento de decisiones de properties (Decisiones 1–5) no existe en el repo; espec de Decisión 4 vive solo en una conversación vieja | V1 — S2 la re-deriva y commitea |
-| b9 | Logo de agencia: `r2_key` sin modelo de configuración | V1.1 |
+| b9 | Logo de agencia: `r2_key` sin modelo de configuración. Desde S5 es también el futuro dueño de los campos `AGENCY_*` del membrete (hoy en settings vía env, single-tenant) | V1.1 |
 | b10 | Testing pendiente histórico (ContactForm.clean, signals audit before/after, views HTMX) + `storage.py` sin tests | Tests de cada track dentro del track; cola histórica → V1.1 |
 | b11 | Numeración de billing incompatible AFIP (gaps por `nextval()`) | V2 — decisión explícita: V1 entrega comprobantes internos no fiscales |
 | b12 | **Superficie de operaciones de propiedad** (sustituye a b1/b4): ninguna view llama `withdraw_property` / `restore_property` — retirar/reactivar no se puede hacer desde el backoffice; y el listing de alquiler que queda PAUSED tras una venta (`settle_won_sale`) no tiene señal visible para el agente. Alcance de UI, no de coherencia de dominio | V1 ola 1 (S4 redefinida) |
@@ -52,7 +52,7 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 | c1 | Papelera (soft-deletes consolidados) — depende de a4 (separación por usuario) | V1.1 |
 | c2 | Vista comercial del detail de properties — feedback directo del socio (mostrar propiedad a un cliente sin ruido operativo) | V1 ola 1 (S6) |
 | c3 | Home — contratos por vencer + accesos (mínima, sin portales) en ola 1; sección portales en ola 2 | V1 (S7 + S14) |
-| c4 | Exportar PDF — comprobante de pago en V1 (operación diaria); export genérico de imágenes/documentos en V1.1 | V1 (S5) / V1.1 |
+| c4 | Exportar PDF — **comprobante de pago ✔ ENTREGADO en S5** (WeasyPrint 69.0, on-demand síncrono, sin persistencia — `pdf_url` eliminado del modelo; cuatro tipos, cancelados con banda; detail modal + ícono por fila desktop). Export genérico de imágenes/documentos sigue en V1.1 | ✔ S5 / V1.1 |
 | c5 | Meta Catalog — investigación hecha fuera del repo (Business Verification como bloqueante conocido). Registrar el resumen en `docs/` aunque el track sea V2 | V2 |
 | c6 | Idea de los socios mencionada junto a la administración de alquileres — **PENDIENTE DE ESPECIFICACIÓN**, sin versión asignada. Capturarla en la próxima charla antes de que se pierda | — |
 
@@ -80,9 +80,9 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 ### V1 — ola 1: interno operable → HITO "socios testeando"
 
 Auth (a8) · Track R2/media (a1) · UI creación/edición (a2, b8, edición de
-externas) · Superficie de operaciones de propiedad (b12) · Billing operativo
-(b6, b5, comprobante PDF de c4) · Vista comercial (c2) · Home mínima (c3
-reducida) · Observabilidad fase 1 (b3) · Puesta en producción.
+externas) · Superficie de operaciones de propiedad (b12) · ~~Billing operativo
+(b6, b5, comprobante PDF de c4)~~ **✔ S5** · Vista comercial (c2) · Home
+mínima (c3 reducida) · Observabilidad fase 1 (b3) · Puesta en producción.
 
 ### V1 — ola 2: portales → HITO "entrega completa"
 
@@ -92,8 +92,14 @@ sección portales de Home (a6, resto de c3).
 ### V1.1
 
 Users completo (a4) · Papelera (c1) · Logging estructurado (b3 f2) ·
-Export genérico (c4 resto) · Logo de agencia (b9) · Testing histórico (b10) ·
-Notificaciones por mail (nuevo consumidor de Celery).
+Export genérico (c4 resto) · Logo de agencia (b9 + campos `AGENCY_*`) ·
+Testing histórico (b10) · Notificaciones por mail (nuevo consumidor de
+Celery) · **Refinamiento del comprobante con el socio** (deuda de S5:
+separador de miles, jerarquías, membrete definitivo — natural encadenarla
+con la validación de S6) · **Compartir comprobante** (forma técnica ya
+definida en `adr-frontend.md`; requiere Celery, disponible desde ola 2) ·
+**Search de cobros sobre propiedad de comisiones** (deuda de S5: el camino
+deal→listing/notas queda fuera del filtro actual).
 
 ### V2
 
@@ -115,7 +121,7 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 | S2 | Diseño UI creación/edición: re-derivar y commitear espec de Decisión 4 (salda b8); upload (orden/portada/validaciones), captura de location, edición de externas, ¿thumbnails? | Diseño | ADRs de S1 (puede solaparse con S1) | Las produce esta sesión |
 | S3 | Implementación UI creación/edición | Implementación | S1 + S2 | Las de S2 |
 | S4 | Superficie de operaciones de propiedad (b12): acciones retirar/reactivar en el detail (llaman `withdraw_property`/`restore_property`) + señal visible del listing de alquiler PAUSED post-venta | Mini diseño + implementación (ventana única) | Post-S3 (hereda patrones del detail); las decisiones de superficie pueden adelantarse a S2 si conviene | Backend cerrado y testeado; falta solo la decisión de presentación |
-| S5 | Billing operativo: b6 (moneda por fila), comprobante PDF, b5 (comisiones de alquiler en cobros) | Diseño corto + implementación | — | Falta: librería/layout PDF, dónde viven comisiones de alquiler |
+| ~~S5~~ | **CERRADA (2026-07-09)** — Billing operativo: b6 ✔ (9 puntos + partial), b5 ✔ (selector + columna propiedad + 6 tests), c4 ✔ (display.py, pdf.py, endpoint, dos puntos de descarga, 12 tests). Bonus: CI reparado (requirements/dev.txt, ruff pinneado, libs WeasyPrint). 18 tests nuevos. Ver `s5-billing-operativo.md` | Cerrada | — | Todas cerradas y documentadas |
 | S6 | Vista comercial del detail (c2) | Diseño (relevar con el socio) → implementación | Post-S3 (hereda patrones) | Faltan; insumo = feedback del socio |
 | S7 | Home mínima: contratos por vencer (query request-time) + accesos | Implementación con mini-diseño | Vistas previas (consistencia) | Casi cerradas por reducción de alcance |
 | S8 | Auth (a8): login/logout propios, protección global vía `backoffice_urls.py`, política del admin | Diseño + implementación (ventana única) | — (flotante; obligatoria antes de S10) | Faltan las tres, todas chicas |
@@ -152,10 +158,26 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 
 ---
 
+## 4b. Deudas menores registradas (sin ventana asignada)
+
+Registro para que no se pierdan; ninguna justifica sesión propia hoy. Se
+promueven si aparece el disparador anotado.
+
+- `property_label` duplicado en dos idiomas (elif de template en
+  `_section_cobros`, Python en `display.py`). Disparador: un tercer
+  consumidor → unificar anotando en la view. *(S5)*
+- Ícono de descarga de comprobante en cards mobile. Disparador: pedido del
+  socio con uso real en la mano. *(S5)*
+- Renovación anual de `bricka.com.ar` en nic.ar sin auto-renovación —
+  recordatorio operativo (responsable: cliente, respaldo del desarrollador).
+  *(infra.md)*
+
+---
+
 ## 5. Enmiendas documentales pendientes de commit
 
 **`docs/decisions/seed-data.md`** — tres filas quedaron desactualizadas
-respecto del código; marcarlas RESUELTO con referencia:
+respecto del código; marcarlas RESUELTO con referencia. **Verificado 2026-07-09: siguen sin aplicar en `main`** (S5 enmendó sus propias filas #1 y #2, estas tres siguen pendientes):
 
 - **Gap #4**: la firma de `create_property` expone `title`, `description` y
   `location` desde la sesión de Decisión 3 (umbral operable vs. publicable).
@@ -192,3 +214,12 @@ ahí se cruza contra services y ADRs antes de darlo por abierto.
   contra el código). S4 se redefine de "coherencia de dominio" a "superficie
   de operaciones de propiedad" (b12) y pasa a depender de S3. `seed-data.md`
   suma dos filas al diff documental.
+- **2026-07-09 (enmienda 2)** — S5 CERRADA (verificado contra `main`:
+  `display.py`/`pdf.py`, migración 0009, WeasyPrint en base.txt y CI,
+  `_money.html`, selector sin filtro SALE). b5, b6 y comprobante de c4
+  resueltos. PDF on-demand síncrono sin persistencia — coherente con la
+  partición de ola 1 (sin Celery); `pdf_url` eliminado del modelo. Tres
+  ítems nuevos a V1.1 (refinamiento de comprobante con el socio, compartir
+  comprobante, search de comisiones); b9 anotado como dueño futuro de
+  `AGENCY_*`; sección 4b creada para deudas menores sin ventana. Ola 1
+  restante: S1–S3, S4 (b12), S6, S7, S8, S9, S10.
