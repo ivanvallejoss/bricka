@@ -17,15 +17,15 @@ sistema correr con data variada, no de leer el código en frío.
 
 | # | Gap | Dónde | Dirección |
 | --- | ----- | ------- | ----------- |
-| 1 | Comisión de **alquiler** (deal RENT) sin superficie de listado: ni cobros ni pagos, solo en el detalle del contacto. Las de venta sí se listan (lo agregamos esta sesión). | `billing/selectors.py::get_cobros` | Al activar emisión en `deals/`, decidir dónde viven las comisiones de alquiler. Asimetría deliberada por ahora. |
+| ~~1~~ | ~~Comisión de alquiler sin superficie de listado~~ — **RESUELTO en S5**: la condición `deal_type=SALE` se eliminó de `get_cobros`; todas las comisiones se listan en cobros, con propiedad por fila (contrato → listing → notas de externa). Ver `s5-billing-operativo.md`. | | |
 | 8 | Propiedades `is_external` sin tratamiento visual diferenciado en backoffice (card/listado). Se distinguen solo si el usuario lo escribe en el título. | templates/selectors de `properties/` | Diferenciar por `is_external` (badge/estilo). Ya estaba anticipado en el docstring de `Property`. |
 
 ### Display / UX (no rompe, confunde)
 
 | # | Gap | Dónde | Dirección |
 | --- | ----- | ------- | ----------- |
-| 2 | El template de cobros muestra `$` hardcodeado, sin distinguir moneda. Una comisión USD se ve igual que un alquiler ARS. | `templates/billing/partials/_section_cobros.html` | Renderizar `doc.currency` por fila. |
-| 3 | Comprobantes sin `period` (comisión) desaparecen del listado de cobros al filtrar por mes. Visibles solo sin filtro. | `billing/selectors.py::get_cobros` | Aceptado como "menos sorprendente". Si se quiere bajo un mes, mapear por `date` en vez de `period`. |
+| ~~2~~ | ~~`$` hardcodeado sin distinguir moneda~~ — **RESUELTO en S5**: partial compartido `partials/_money.html` ($ + código ISO), aplicado a los 9 puntos del sistema que renderizan `total_amount` (cobros, pagos, detail modal, contacts, properties, contracts). Ver `s5-billing-operativo.md`. | | |
+| 3 | Comprobantes sin `period` (comisión) desaparecen del listado de cobros al filtrar por mes. Visibles solo sin filtro. | `billing/selectors.py::get_cobros` | Aceptado como "menos sorprendente". Si se quiere bajo un mes, mapear por `date` en vez de `period`. Fijado como comportamiento intencional en `test_get_cobros_period_filter_excludes_documents_without_period` (S5): si ese test rompe, alguien relitigó esto. |
 
 ### Deuda de API interna (funciona, pero el contrato del service miente)
 
@@ -43,7 +43,8 @@ sistema correr con data variada, no de leer el código en frío.
 - **Mora del seed** sembrada como interés simple; corregida a compuesta para
   reconciliar con `calculate_mora`.
 - **Comisión de venta** ahora listada en cobros (`get_cobros`, condicionada a
-  `deal_type=SALE`).
+  `deal_type=SALE`). *Superado en S5:* la condición se eliminó — todas las
+  comisiones se listan.
 
 ## Pre-existentes confirmados (ya en docstrings)
 

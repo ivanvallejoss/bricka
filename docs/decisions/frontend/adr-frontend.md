@@ -1045,20 +1045,29 @@ el fill del owner field.
 
 ### `COMMISSION_RECEIPT` excluido de `_COBROS_TYPES`
 
-**Estado:** deuda técnica activa, documentada en `billing/selectors.py`.
+**Estado:** SALDADA en S5.
 
-`_COBROS_TYPES` no incluye `DocumentType.COMMISSION_RECEIPT`. Agregar cuando
-`deals/` tenga URLs activas y un punto de entrada para emisión de comisiones.
+`COMMISSION_RECEIPT` integra `_COBROS_TYPES` sin condición de `deal_type`:
+toda comisión es un cobro. La deuda no esperó al punto de emisión en `deals/`
+porque el negocio la volvió cara antes (administración activa de alquileres
+con comisiones invisibles). Rationale completo en `s5-billing-operativo.md`.
 
 ---
 
 ### Compartir / descargar comprobante
 
-**Estado:** pendiente — V1.1.
+**Estado:** descargar SALDADA en S5; compartir pendiente — V1.1+.
 
-Los botones de compartir/descargar en `_document_detail_modal.html` están
-presentes pero deshabilitados. Requiere: generación de PDF server-side y URL
-pública con token firmado fuera de `/backoffice/`.
+Descarga operativa: `GET /backoffice/billing/<uuid>/pdf/` (WeasyPrint,
+on-demand, sin persistencia), desde el detail modal y por fila en la tabla
+desktop de cobros/pagos (mobile deliberadamente excluido: la card completa es
+target de `hx-get`, el camino es card → modal → descarga).
+
+Compartir, forma futura definida en S5: persistencia del PDF en R2 (bucket
+privado, key en un campo `pdf_r2_key` nuevo — `pdf_url` se eliminó por estar
+mal tipado para este futuro) + URL pública con token firmado fuera de
+`/backoffice/` + envío por mail/WhatsApp como task en background. Cae en la
+ola que estrena Celery; no hay infra de email en el repo.
 
 ---
 
