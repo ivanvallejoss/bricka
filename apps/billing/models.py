@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.db import models
 
 from apps.common.choices import Currency
@@ -82,7 +81,6 @@ class BillingDocument(BaseModel, AuditableMixin):
         choices=DocumentStatus.choices,
         default=DocumentStatus.ISSUED,
     )
-    pdf_url = models.URLField(blank=True)
     recipient_name = models.CharField(max_length=255, default="")
     recipient_document_type = models.CharField(max_length=20, default="", blank=True)
     recipient_document_number = models.CharField(max_length=50, default="", blank=True)

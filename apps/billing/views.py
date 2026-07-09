@@ -12,14 +12,10 @@ from apps.contracts.selectors import calculate_mora, get_contract_detail
 from .choices import ConceptLineType, DocumentType
 from .concept import ConceptLine
 from .exceptions import BillingBusinessError, CannotCancelDocument, InvalidConceptLine
+from .display import enrich_lines_for_display, month_label
 from .selectors import get_billing_document, get_cobros, get_pagos
 from .services import cancel_billing_document, create_billing_document
 
-
-_MONTH_NAMES = [
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-]
 
 _VALID_TYPES_FROM_CONTRACT = {
     DocumentType.RENT_RECEIPT,
@@ -27,36 +23,8 @@ _VALID_TYPES_FROM_CONTRACT = {
     DocumentType.OWNER_STATEMENT,
 }
 
-_SUBTRACTIVE_IN_RECEIPT = {ConceptLineType.OTHER_CREDIT}
-_SUBTRACTIVE_IN_OWNER_STATEMENT = {
-    ConceptLineType.COMMISSION,
-    ConceptLineType.EXPENSE,
-    ConceptLineType.OTHER_CHARGE,
-}
-
-
-def _month_label(d: date) -> str:
-    return f"{_MONTH_NAMES[d.month - 1]} {d.year}"
-
-
-def _enrich_lines_for_display(document) -> list[dict]:
-    subtractive = (
-        _SUBTRACTIVE_IN_OWNER_STATEMENT
-        if document.document_type == DocumentType.OWNER_STATEMENT
-        else _SUBTRACTIVE_IN_RECEIPT
-    )
-    result = []
-    for line in document.concept:
-        result.append({
-            **line,
-            "is_subtractive": line["type"] in subtractive,
-            "type_label": ConceptLineType(line["type"]).label,
-        })
-    return result
-
-
 def _build_initial_lines(document_type: str, contract, mora, today: date) -> list[dict]:
-    month = _month_label(today)
+    month = month_label(today)
     price = str(contract.current_price)
 
     if document_type == DocumentType.RENT_RECEIPT:
@@ -214,7 +182,7 @@ def document_detail(request, document_id):
 
     return render(request, "billing/partials/_document_detail_modal.html", {
         "document": document,
-        "enriched_lines": _enrich_lines_for_display(document),
+        "enriched_lines": enrich_lines_for_display(document),
     })
 
 
