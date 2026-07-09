@@ -59,6 +59,7 @@ Contexto requerido: page_obj, search, period_str
             <col class="w-28">
             <col class="w-24">
             <col class="w-24">
+            <col class="w-12">
         </colgroup>
         <thead>
             <tr class="border-b border-outline">
@@ -67,6 +68,7 @@ Contexto requerido: page_obj, search, period_str
                 <th class="px-4 py-3 text-left text-[11px] font-medium text-on-surface-variant">Período</th>
                 <th class="px-4 py-3 text-left text-[11px] font-medium text-on-surface-variant">Fecha</th>
                 <th class="px-4 py-3 text-right text-[11px] font-medium text-on-surface-variant">Total</th>
+                <th class="px-2 py-3"><span class="sr-only">Descargar</span></th>
             </tr>
         </thead>
         <tbody>
@@ -105,6 +107,15 @@ Contexto requerido: page_obj, search, period_str
                         {% include "partials/_money.html" with amount=doc.total_amount currency=doc.currency %}
                     </p>
                 </td>
+                <td class="px-2 py-3 text-right">
+                    <a href="{% url 'billing:pdf' doc.pk %}"
+                       onclick="event.stopPropagation()"
+                       title="Descargar PDF"
+                       class="inline-flex p-1.5 rounded text-on-surface-variant
+                              hover:bg-surface-container hover:text-on-surface transition-colors">
+                        {% include "icons/download.html" with size="14" %}
+                    </a>
+                </td>
             </tr>
             {% endfor %}
 
@@ -113,7 +124,7 @@ Contexto requerido: page_obj, search, period_str
                 hx-trigger="revealed"
                 hx-target="closest tbody"
                 hx-swap="beforeend">
-                <td colspan="5" class="px-4 py-4 text-center">
+                <td colspan="6" class="px-4 py-4 text-center">
                     <p class="text-[12px] text-on-surface-variant">Cargando…</p>
                 </td>
             </tr>

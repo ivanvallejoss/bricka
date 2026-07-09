@@ -167,17 +167,16 @@ Contexto requerido: document, enriched_lines
             <div class="px-5 py-4 border-t border-outline bg-surface-container-low
                         flex items-center justify-between gap-3 shrink-0">
 
-                {# Compartir/descargar — V1.1 #}
+                {# Descargar PDF — S5/c4. Compartir (mail/WhatsApp) sigue V1.1+ #}
                 <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        disabled
-                        title="Disponible próximamente"
+                        <a
+                        href="{% url 'billing:pdf' document.pk %}"
+                        title="Descargar PDF"
                         class="p-2 rounded border border-outline text-on-surface-variant
-                               opacity-40 cursor-not-allowed"
+                               hover:bg-surface-container hover:text-on-surface transition-colors"
                     >
                         {% include "icons/download.html" with size="14" %}
-                    </button>
+                    </a>
                 </div>
 
                 {# Cancelar — solo si está emitido #}
