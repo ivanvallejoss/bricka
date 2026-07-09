@@ -1,0 +1,121 @@
+{% comment %}
+Comprobante interno de BillingDocument — render exclusivo de
+apps/billing/pdf.py vía WeasyPrint. CSS propio embebido: Tailwind NO
+participa de este pipeline (por eso no reusa partials/_money.html).
+Documento NO fiscal por decisión de roadmap (AFIP = b11, V2): leyenda
+fija visible, sin vocabulario de factura (sin letra, CAE ni QR).
+{% endcomment %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+    @page { size: A4; margin: 22mm 18mm; }
+    body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-size: 10.5pt; color: #1a1a1a; line-height: 1.45;
+    }
+    .header {
+        display: flex; justify-content: space-between;
+        border-bottom: 2px solid #1a1a1a;
+        padding-bottom: 12pt; margin-bottom: 14pt;
+    }
+    .agency-name { font-size: 16pt; font-weight: 700; margin: 0 0 4pt; }
+    .agency-data { font-size: 8.5pt; color: #444; margin: 0; }
+    .doc-meta { text-align: right; }
+    .doc-type { font-size: 13pt; font-weight: 700; margin: 0; }
+    .doc-number { font-size: 11pt; margin: 2pt 0 6pt; }
+    .doc-date { font-size: 9pt; color: #444; margin: 0; }
+    .non-fiscal {
+        font-size: 8.5pt; color: #666; border: 1px solid #bbb;
+        padding: 4pt 8pt; display: inline-block; margin-bottom: 16pt;
+    }
+    .block-label {
+        font-size: 8pt; text-transform: uppercase;
+        letter-spacing: 0.08em; color: #666; margin: 0 0 2pt;
+    }
+    .recipient { margin-bottom: 16pt; }
+    .recipient p { margin: 0; }
+    table.concepts { width: 100%; border-collapse: collapse; margin-top: 8pt; }
+    table.concepts th {
+        font-size: 8pt; text-transform: uppercase; letter-spacing: 0.08em;
+        color: #666; text-align: left; padding: 4pt 6pt;
+        border-bottom: 1px solid #1a1a1a;
+    }
+    table.concepts td { padding: 5pt 6pt; border-bottom: 1px solid #ddd; }
+    td.amount, th.amount { text-align: right; font-variant-numeric: tabular-nums; }
+    .subtractive { color: #8a1f1f; }
+    tr.total td {
+        border-bottom: none; border-top: 2px solid #1a1a1a;
+        font-weight: 700; font-size: 12pt; padding-top: 8pt;
+    }
+    .currency { font-size: 8.5pt; font-weight: 400; color: #444; }
+    .footer { margin-top: 28pt; font-size: 8.5pt; color: #444; }
+    .cancelled-band {
+        position: fixed; top: 40%; left: 0; right: 0;
+        text-align: center; transform: rotate(-18deg);
+        font-size: 42pt; font-weight: 800;
+        color: rgba(170, 30, 30, 0.28); letter-spacing: 0.25em;
+    }
+</style>
+</head>
+<body>
+{% if is_cancelled %}<div class="cancelled-band">CANCELADO</div>{% endif %}
+
+<div class="header">
+    <div>
+        <p class="agency-name">{{ agency.name }}</p>
+        {% if agency.cuit %}<p class="agency-data">CUIT {{ agency.cuit }}</p>{% endif %}
+        {% if agency.address %}<p class="agency-data">{{ agency.address }}</p>{% endif %}
+        {% if agency.phone %}<p class="agency-data">Tel. {{ agency.phone }}</p>{% endif %}
+        {% if agency.email %}<p class="agency-data">{{ agency.email }}</p>{% endif %}
+    </div>
+    <div class="doc-meta">
+        <p class="doc-type">{{ type_label }}</p>
+        <p class="doc-number">N.º {{ document.number|stringformat:"04d" }}</p>
+        <p class="doc-date">Fecha: {{ document.date|date:"d/m/Y" }}</p>
+        {% if period_label %}<p class="doc-date">Período: {{ period_label }}</p>{% endif %}
+    </div>
+</div>
+
+<p class="non-fiscal">Comprobante interno — sin validez fiscal</p>
+
+<div class="recipient">
+    <p class="block-label">{{ recipient_label }}</p>
+    <p><strong>{{ document.recipient_name }}</strong></p>
+    {% if document.recipient_document_number %}
+    <p>{{ document.recipient_document_type }} {{ document.recipient_document_number }}</p>
+    {% endif %}
+    {% if property_label %}<p>Propiedad: {{ property_label }}</p>{% endif %}
+</div>
+
+<table class="concepts">
+    <thead>
+        <tr>
+            <th>Concepto</th>
+            <th class="amount">Importe</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for line in enriched_lines %}
+        <tr>
+            <td>{{ line.description }} <span class="agency-data">({{ line.type_label }})</span></td>
+            <td class="amount{% if line.is_subtractive %} subtractive{% endif %}">
+                {% if line.is_subtractive %}&minus;{% endif %}${{ line.amount|floatformat:0 }}
+            </td>
+        </tr>
+        {% endfor %}
+        <tr class="total">
+            <td>Total</td>
+            <td class="amount">${{ document.total_amount|floatformat:0 }} <span class="currency">{{ document.currency }}</span></td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="footer">
+    {% if document.created_by %}
+    <p>Emitido por {{ document.created_by.get_full_name|default:document.created_by.username }}</p>
+    {% endif %}
+    <p>Documento generado por Bricka — {{ agency.name }}</p>
+</div>
+</body>
+</html>
