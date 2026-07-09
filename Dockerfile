@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
     libgdal-dev \
     gdal-bin \
     libgeos-dev \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz-subset0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Instala GDAL con la versión exacta que tiene el sistema
