@@ -96,6 +96,10 @@ CELERY_TASK_TRACK_STARTED = True
 AUTH_USER_MODEL = "users.User"
 LOGIN_URL = "/backoffice/login/"
 LOGIN_REDIRECT_URL = "/backoffice/"
+AUTHENTICATION_BACKENDS = [
+    "apps.users.backends.EmailBackend",
+    "django.contrib.auth.backends.ModelBackend"
+]
 
 # --------------------------------------------------------------------------
 # Storage de Django (framework). NADA de la media de negocio pasa por acá:
