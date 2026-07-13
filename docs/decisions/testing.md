@@ -49,6 +49,13 @@ apps/contacts/
 - URLs
 - Templates
 
+### Constante compartida vs literal en asserts
+
+- Cuando dos artefactos no deben divergir jamás (copy de UI y su test),
+  el test referencia la fuente única (ej. `EmailAuthenticationForm.error_messages`); cuando el trabajo del test es fijar un contrato con algo externo (formato de URL/header que
+  consume HTMX o el browser), el esperado se escribe literal — derivarlo
+  del mismo código que lo produce volvería el test tautológico.
+
 ---
 
 ## Factories vs fixtures
