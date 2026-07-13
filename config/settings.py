@@ -94,12 +94,24 @@ CELERY_TASK_TRACK_STARTED = True
 
 # Auth
 AUTH_USER_MODEL = "users.User"
-LOGIN_URL = "/backoffice/login/"
-LOGIN_REDIRECT_URL = "/backoffice/"
 AUTHENTICATION_BACKENDS = [
     "apps.users.backends.EmailBackend",
     "django.contrib.auth.backends.ModelBackend"
 ]
+# Rutas por nombre con namespace, no paths hardcodeados: si la URL se
+# mueve, el settings no se entera. DJango las resuelve con reverse()
+LOGIN_URL = "users:login"
+LOGIN_REDIRECT_URL = "properties:list"
+LOGOUT_REDIRECT_URL = "users:login"
+
+# Sesiones - politica V1 (ADR en docs/decisions/auth.md):
+# TTL de 2 semana con ventana deslizante. Cada request reescribe la
+# sesion y corre el vencimiento: uso frecuente no ve el login nunca;
+# inactividad de 2 semanas re-loguea. Costo: un write por request,
+# irrelevante a esta escala. Flags en produccion (SESSION_COOKIE_SECURE, 
+# CSRF_COOKIE_SECURE) No van aca.
+SESSION_COOKIE_AGE = 1209600 # 2 semanas, default explicito
+SESSION_SAVE_EVERY_REQUEST = True 
 
 # --------------------------------------------------------------------------
 # Storage de Django (framework). NADA de la media de negocio pasa por acá:
