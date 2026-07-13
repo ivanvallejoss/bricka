@@ -4,7 +4,7 @@ Documento vivo de la ventana de planificación. Criterio rector: ENTREGA —
 prioriza lo que el socio necesita pulido y estable para operar. Relegar un
 ítem a V1.1/V2 es una decisión escrita, no un olvido.
 
-**Última actualización:** 2026-07-09 (enmienda 2 — cierre de S5)
+**Última actualización:** 2026-07-13 (enmienda 3 — cierre de S8)
 **Base verificada:** `main` como única fuente de verdad (todo commiteado
 salvo `.env`).
 
@@ -26,7 +26,7 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 | a5 | ZonaProp | `portal/models.py` vacío; `integrations` solo modelos de eventos. ADR de token Navent (Redis) cerrado. Todo el cableado por hacer. → V1 ola 2 (decisión de producto). |
 | a6 | Vista de publicaciones | Parciales existentes: `slide_over_publications`, `detail_publication`. La vista consolidada depende de saber qué devuelve el portal → V1 ola 2, después de S13. |
 | a7 | Hetzner / preparativos infra | Ventana paralela (dominio, Cloudflare, consolas R2). Dependencia externa del roadmap, no sesión propia. Gate de costo: Hetzner al ~90% funcional. |
-| a8 | Auth (login/logout fuera del admin + protección global) | NUEVO — surgió en planificación. No existe flujo ni middleware. `User` ya soporta login por email; `backoffice_urls.py` centralizado habilita protección por namespace. → V1 ola 1. |
+| ~~a8~~ | ~~Auth (login/logout fuera del admin + protección global)~~ — **RESUELTO en S8**: `EmailBackend` + constraint CI + normalización; `BackofficeLoginRequiredMiddleware` con exención mínima y rama HTMX (200 + `HX-Redirect`); login/logout/password-change propios; sesión deslizante 2 semanas; validadores de password; `UserAdmin` con alta por email y archive/restore. 26 tests. Ver `S8-auth.md`. *(Nota: esta fila afirmaba "no existe middleware" y "`User` ya soporta login por email" — lo primero quedó viejo, lo segundo era aspiracional hasta S8; el archivo real es `apps/urls.py`, no `backoffice_urls.py`)* | — |
 
 ### (b) — Solo en el repo: gaps destapados
 
@@ -79,7 +79,7 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 
 ### V1 — ola 1: interno operable → HITO "socios testeando"
 
-Auth (a8) · Track R2/media (a1) · UI creación/edición (a2, b8, edición de
+~~Auth (a8)~~ **✔ S8** · Track R2/media (a1) · UI creación/edición (a2, b8, edición de
 externas) · Superficie de operaciones de propiedad (b12) · ~~Billing operativo
 (b6, b5, comprobante PDF de c4)~~ **✔ S5** · Vista comercial (c2) · Home
 mínima (c3 reducida) · Observabilidad fase 1 (b3) · Puesta en producción.
@@ -99,12 +99,21 @@ separador de miles, jerarquías, membrete definitivo — natural encadenarla
 con la validación de S6) · **Compartir comprobante** (forma técnica ya
 definida en `adr-frontend.md`; requiere Celery, disponible desde ola 2) ·
 **Search de cobros sobre propiedad de comisiones** (deuda de S5: el camino
-deal→listing/notas queda fuera del filtro actual).
+deal→listing/notas queda fuera del filtro actual) · **Reset de password por
+email** (deuda de S8; consumidor de la infra de mail/Celery) · **Links de
+invitación** (deuda de S8: socio genera link con grupo embebido vía
+`TimestampSigner`, entrega por WhatsApp sin mail; frontera V1.1/V2 —
+primera superficie de registro semi-pública, ahí el rate limiting deja de
+ser opcional; natural encadenarlo con a4) · b9 suma: **logout + cambio de
+contraseña en mobile** (pantalla de Configuración; hoy inexistentes en
+mobile a propósito).
 
 ### V2
 
 Meta Catalog (c5) · Atributos con valor / vocabulario por tipo / A2 (b7) ·
-Numeración AFIP (b11) · Pipeline visual (ya diferido por ADR).
+Numeración AFIP (b11) · Pipeline visual (ya diferido por ADR) · **Rate
+limiting de login / lockout** (de S8; se adelanta si entran los invite
+links) · **2FA** (de S8; nombrado, sin diseño).
 
 ---
 
@@ -123,10 +132,10 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 | S4 | Superficie de operaciones de propiedad (b12): acciones retirar/reactivar en el detail (llaman `withdraw_property`/`restore_property`) + señal visible del listing de alquiler PAUSED post-venta | Mini diseño + implementación (ventana única) | Post-S3 (hereda patrones del detail); las decisiones de superficie pueden adelantarse a S2 si conviene | Backend cerrado y testeado; falta solo la decisión de presentación |
 | ~~S5~~ | **CERRADA (2026-07-09)** — Billing operativo: b6 ✔ (9 puntos + partial), b5 ✔ (selector + columna propiedad + 6 tests), c4 ✔ (display.py, pdf.py, endpoint, dos puntos de descarga, 12 tests). Bonus: CI reparado (requirements/dev.txt, ruff pinneado, libs WeasyPrint). 18 tests nuevos. Ver `s5-billing-operativo.md` | Cerrada | — | Todas cerradas y documentadas |
 | S6 | Vista comercial del detail (c2) | Diseño (relevar con el socio) → implementación | Post-S3 (hereda patrones) | Faltan; insumo = feedback del socio |
-| S7 | Home mínima: contratos por vencer (query request-time) + accesos | Implementación con mini-diseño | Vistas previas (consistencia) | Casi cerradas por reducción de alcance |
-| S8 | Auth (a8): login/logout propios, protección global vía `backoffice_urls.py`, política del admin | Diseño + implementación (ventana única) | — (flotante; obligatoria antes de S10) | Faltan las tres, todas chicas |
+| S7 | Home mínima: contratos por vencer (query request-time) + accesos. **+ de S8: repuntar `LOGIN_REDIRECT_URL` de `properties:list` (interim) a la home real** | Implementación con mini-diseño | Vistas previas (consistencia) | Casi cerradas por reducción de alcance |
+| ~~S8~~ | **CERRADA (2026-07-13)** — Auth completo (ver a8 y `S8-auth.md`). Roto a propósito: logout/password-change inexistentes en mobile (bottom nav 5/5; destino b9). 26 tests, suite verde | Cerrada | — | Todas cerradas y documentadas |
 | S9 | Observabilidad f1: upgrade SDK, init module, `before_send` | Implementación | — (justo antes de producción) | Diseño previo NO commiteado — la sesión deja el rationale en docs |
-| S10 | Puesta en producción — **HITO: socios testeando** | Implementación | Todas + infra (dominio, Cloudflare, Hetzner) | Falta: checklist deploy, settings prod, migración de datos reales |
+| S10 | Puesta en producción — **HITO: socios testeando** | Implementación | Todas + infra (dominio, Cloudflare, Hetzner) | Falta: checklist deploy, settings prod, migración de datos reales. **De S8, ya decididos, activar acá:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_*` según config final de dominio |
 
 ### Ola 2
 
@@ -171,6 +180,19 @@ promueven si aparece el disparador anotado.
 - Renovación anual de `bricka.com.ar` en nic.ar sin auto-renovación —
   recordatorio operativo (responsable: cliente, respaldo del desarrollador).
   *(infra.md)*
+- Acoplamiento `BackofficeLoginRequiredMiddleware` → `HtmxMiddleware` (orden
+  en `MIDDLEWARE`): hoy documentado solo en `S8-auth.md`. Disparador:
+  cualquier sesión que toque `MIDDLEWARE` lo hace ruidoso primero (guard
+  `hasattr(request, "htmx")` con error explícito o system check). *(S8)*
+- Nota de escala: `SESSION_SAVE_EVERY_REQUEST` = un write de sesión por
+  request HTMX (partials incluidos), no por página. Irrelevante hoy;
+  revisitar solo si aparece en un profile. *(S8)*
+- Migración `00002_create_groups` con cinco dígitos — typo inofensivo, **NO
+  renombrar** (Django referencia por string exacto; `0003` depende del
+  nombre literal). *(S8)*
+- Deriva de nombre en docs: los ADRs y este roadmap nombraban
+  `backoffice_urls.py`; el archivo real es `apps/urls.py`. Corregir al tocar
+  cada doc, sin renombrar código. *(S8)*
 
 ---
 
@@ -223,3 +245,15 @@ ahí se cruza contra services y ADRs antes de darlo por abierto.
   comprobante, search de comisiones); b9 anotado como dueño futuro de
   `AGENCY_*`; sección 4b creada para deudas menores sin ventana. Ola 1
   restante: S1–S3, S4 (b12), S6, S7, S8, S9, S10.
+- **2026-07-13 (enmienda 3)** — S8 CERRADA (verificado contra `main`:
+  `EmailBackend` con timing constante, constraint CI en migración 0003,
+  middleware con rama HTMX en `config/middleware.py`, settings de sesión y
+  validadores, 26 tests). a8 resuelto; flags de producción decididos en S8
+  quedan asignados a S10; repunte de `LOGIN_REDIRECT_URL` asignado a S7.
+  Deudas de S8 distribuidas: reset por email e invite links a V1.1, rate
+  limiting y 2FA a V2, logout mobile a b9. Cuatro registros nuevos en 4b
+  (acoplamiento de middleware, nota de escala de sesión, migración 00002,
+  deriva `backoffice_urls`/`apps/urls`). S8 era la sesión flotante: la
+  ola 1 restante queda S1→S2→S3→S4, S6, S7, S9, S10 — el camino crítico
+  R2→UI sigue siendo el frente abierto más largo.
+  
