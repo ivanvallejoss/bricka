@@ -1,7 +1,9 @@
 import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
+
 from .managers import ActiveUserManager, AllUsersManager
 
 
@@ -45,6 +47,16 @@ class User(AbstractUser):
     objects = ActiveUserManager()
     all_objects = AllUsersManager()
 
+    def save(self, *args, **kwargs):
+        """
+        Normaliza email a lowercase antes de persistir. El constraint
+        de unicidad es case-insensitive; normalizar en save() garantiza
+        que el dato guardado ya esté en forma canónica venga de donde
+        venga (admin, shell, seed, futuro invite link).
+        """
+        self.email = self.email.lower()
+        super().save(*args, **kwargs)
+
     def soft_delete(self):
         """
         Archiva el usuario. Coordina dos mecanismos:
@@ -70,6 +82,13 @@ class User(AbstractUser):
         return self.groups.filter(name=UserGroup.AGENTE).exists()
 
     class Meta:
-        base_manager_name = "all_objects"
-        verbose_name = "usuario"
-        verbose_name_plural = "usuarios"
+            base_manager_name = "all_objects"
+            verbose_name = "usuario"
+            verbose_name_plural = "usuarios"
+            constraints = [
+                models.UniqueConstraint(
+                    Lower("email"),
+                    condition=~models.Q(email=""),
+                    name="users_user_email_ci_unique",
+                ),
+            ]
