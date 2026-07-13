@@ -92,12 +92,21 @@ CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TIMEZONE = "America/Argentina/Buenos_Aires"
 CELERY_TASK_TRACK_STARTED = True
 
+
 # Auth
 AUTH_USER_MODEL = "users.User"
 AUTHENTICATION_BACKENDS = [
     "apps.users.backends.EmailBackend",
     "django.contrib.auth.backends.ModelBackend"
 ]
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+     "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 # Rutas por nombre con namespace, no paths hardcodeados: si la URL se
 # mueve, el settings no se entera. DJango las resuelve con reverse()
 LOGIN_URL = "users:login"
@@ -112,6 +121,8 @@ LOGOUT_REDIRECT_URL = "users:login"
 # CSRF_COOKIE_SECURE) No van aca.
 SESSION_COOKIE_AGE = 1209600 # 2 semanas, default explicito
 SESSION_SAVE_EVERY_REQUEST = True 
+
+
 
 # --------------------------------------------------------------------------
 # Storage de Django (framework). NADA de la media de negocio pasa por acá:
