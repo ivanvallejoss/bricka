@@ -1,0 +1,23 @@
+{# PROVISIONAL S8 — esqueleto funcional. Pase visual pendiente:      #}
+{# verificar tokens en static/src/input.css y frontend.md antes.     #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingresar — Bricka</title>
+</head>
+<body>
+    <main>
+        <h1>Bricka</h1>
+        {% if form.errors %}
+            <p>{{ form.non_field_errors }}</p>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_div }}
+            <button type="submit">Ingresar</button>
+        </form>
+    </main>
+</body>
+</html>
