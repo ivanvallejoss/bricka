@@ -4,7 +4,7 @@ Documento vivo de la ventana de planificación. Criterio rector: ENTREGA —
 prioriza lo que el socio necesita pulido y estable para operar. Relegar un
 ítem a V1.1/V2 es una decisión escrita, no un olvido.
 
-**Última actualización:** 2026-07-13 (enmienda 3 — cierre de S8)
+**Última actualización:** 2026-07-14 (enmienda 4 — cierre de preparativos de infra)
 **Base verificada:** `main` como única fuente de verdad (todo commiteado
 salvo `.env`).
 
@@ -25,7 +25,7 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 | a4 | Usuarios | Base existente: `User` custom (UUID, soft delete, managers) + grupos `socio`/`agente` por data migration. Pendiente: perfil (nombre/foto), asociaciones agente↔entidades, uso de roles en vistas. → V1.1 |
 | a5 | ZonaProp | `portal/models.py` vacío; `integrations` solo modelos de eventos. ADR de token Navent (Redis) cerrado. Todo el cableado por hacer. → V1 ola 2 (decisión de producto). |
 | a6 | Vista de publicaciones | Parciales existentes: `slide_over_publications`, `detail_publication`. La vista consolidada depende de saber qué devuelve el portal → V1 ola 2, después de S13. |
-| a7 | Hetzner / preparativos infra | Ventana paralela (dominio, Cloudflare, consolas R2). Dependencia externa del roadmap, no sesión propia. Gate de costo: Hetzner al ~90% funcional. |
+| a7 | Hetzner / preparativos infra | **Ventana de preparativos CERRADA (2026-07-14)**: dominio `inmobiliariabricka.com` (existente en Namecheap de los socios — se descartó comprar `bricka.com.ar`), zona migrada a cuenta Cloudflare propia (Active, landing intacta), 4 buckets R2 creados con custom domain `media.` (prod) y r2.dev (dev), tokens scoped por entorno, CORS dev, SSL Full (Strict). 2FA del socio ✔, dev como Administrator ✔, titularidad Namecheap ✔. Ver `infra.md`. **Gate de S1 destrabado.** Resto (registro `app.`, `A` raíz, CORS prod, IP filtering) → S10. Gate de costo Hetzner: sin cambios (~90% funcional). |
 | ~~a8~~ | ~~Auth (login/logout fuera del admin + protección global)~~ — **RESUELTO en S8**: `EmailBackend` + constraint CI + normalización; `BackofficeLoginRequiredMiddleware` con exención mínima y rama HTMX (200 + `HX-Redirect`); login/logout/password-change propios; sesión deslizante 2 semanas; validadores de password; `UserAdmin` con alta por email y archive/restore. 26 tests. Ver `S8-auth.md`. *(Nota: esta fila afirmaba "no existe middleware" y "`User` ya soporta login por email" — lo primero quedó viejo, lo segundo era aspiracional hasta S8; el archivo real es `apps/urls.py`, no `backoffice_urls.py`)* | — |
 
 ### (b) — Solo en el repo: gaps destapados
@@ -126,7 +126,7 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 
 | # | Sesión | Tipo | Depende de | Decisiones |
 | --- | --- | --- | --- | --- |
-| S1 | Track R2/media: reconciliar duplicados de `storage.py`, verificar wiring, sembrar `PropertyMedia` en seed (resuelve el rojo deliberado), tests | Implementación | Buckets dev creados (infra) | Cerradas (ADRs en `adr-design.md`). Nueva: qué función de cada par duplicado sobrevive |
+| S1 | Track R2/media: reconciliar duplicados de `storage.py`, verificar wiring contra buckets reales, sembrar `PropertyMedia` en seed (resuelve el rojo deliberado), tests | Implementación | ~~Buckets dev creados (infra)~~ **✔ cumplida (2026-07-14)** — falta solo poblar `.env` dev con el inventario de variables de `infra.md` (tokens en gestor de contraseñas) | Cerradas (ADRs en `adr-design.md`). Nueva: qué función de cada par duplicado sobrevive. Confirmado: no hay código sin pushear — `main` es todo |
 | S2 | Diseño UI creación/edición: re-derivar y commitear espec de Decisión 4 (salda b8); upload (orden/portada/validaciones), captura de location, edición de externas, ¿thumbnails? | Diseño | ADRs de S1 (puede solaparse con S1) | Las produce esta sesión |
 | S3 | Implementación UI creación/edición | Implementación | S1 + S2 | Las de S2 |
 | S4 | Superficie de operaciones de propiedad (b12): acciones retirar/reactivar en el detail (llaman `withdraw_property`/`restore_property`) + señal visible del listing de alquiler PAUSED post-venta | Mini diseño + implementación (ventana única) | Post-S3 (hereda patrones del detail); las decisiones de superficie pueden adelantarse a S2 si conviene | Backend cerrado y testeado; falta solo la decisión de presentación |
@@ -135,7 +135,7 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 | S7 | Home mínima: contratos por vencer (query request-time) + accesos. **+ de S8: repuntar `LOGIN_REDIRECT_URL` de `properties:list` (interim) a la home real** | Implementación con mini-diseño | Vistas previas (consistencia) | Casi cerradas por reducción de alcance |
 | ~~S8~~ | **CERRADA (2026-07-13)** — Auth completo (ver a8 y `S8-auth.md`). Roto a propósito: logout/password-change inexistentes en mobile (bottom nav 5/5; destino b9). 26 tests, suite verde | Cerrada | — | Todas cerradas y documentadas |
 | S9 | Observabilidad f1: upgrade SDK, init module, `before_send` | Implementación | — (justo antes de producción) | Diseño previo NO commiteado — la sesión deja el rationale en docs |
-| S10 | Puesta en producción — **HITO: socios testeando** | Implementación | Todas + infra (dominio, Cloudflare, Hetzner) | Falta: checklist deploy, settings prod, migración de datos reales. **De S8, ya decididos, activar acá:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_*` según config final de dominio |
+| S10 | Puesta en producción — **HITO: socios testeando** | Implementación | Todas + infra (dominio ✔, Cloudflare ✔, Hetzner pendiente) | Falta: checklist deploy, settings prod, migración de datos reales. **De S8, ya decididos, activar acá:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_*` según config final de dominio. **De infra, ejecutar acá:** registro `app.` + proxy naranja, recambio del `A` raíz (sale Tokko, entra el CRM), CORS prod en `bricka-media` (origin `https://app.inmobiliariabricka.com`), IP filtering del token `bricka-app-prod` con la IP de Hetzner, cert de origen (Cloudflare origin cert o Let's Encrypt) |
 
 ### Ola 2
 
@@ -149,8 +149,10 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 
 ### Transversales sin sesión propia
 
-- Ventana de infra: buckets dev antes de S1; dominio + Hetzner antes de S10;
-  trámite Navent cuanto antes.
+- Ventana de infra: ~~buckets dev antes de S1~~ ✔; Hetzner + tareas de
+  deploy → absorbidas por S10. La ventana de preparativos cerró — deja de
+  ser dependencia paralela. **Trámite Navent: sigue sin iniciar y sigue
+  siendo la única dependencia externa que puede mover la entrega completa.**
 - Fix documental de `seed-data.md` (§5) — commiteable hoy.
 - Captura de c6 en la próxima charla con los socios.
 
@@ -177,9 +179,13 @@ promueven si aparece el disparador anotado.
   consumidor → unificar anotando en la view. *(S5)*
 - Ícono de descarga de comprobante en cards mobile. Disparador: pedido del
   socio con uso real en la mano. *(S5)*
-- Renovación anual de `bricka.com.ar` en nic.ar sin auto-renovación —
-  recordatorio operativo (responsable: cliente, respaldo del desarrollador).
-  *(infra.md)*
+- Renovación anual de `inmobiliariabricka.com` en Namecheap: titularidad y
+  cuenta de los socios confirmadas (2026-07-14); **flag de auto-renew: no
+  confirmado explícitamente** — verificar en la próxima visita al panel y
+  borrar esta línea. *(infra.md)*
+- Aviso de cortesía a Tokko (zona DNS vieja quedó muerta): **descartado por
+  decisión (2026-07-14, "no necesario")** — registrado para que sea
+  decisión y no olvido. *(infra.md)*
 - Acoplamiento `BackofficeLoginRequiredMiddleware` → `HtmxMiddleware` (orden
   en `MIDDLEWARE`): hoy documentado solo en `S8-auth.md`. Disparador:
   cualquier sesión que toque `MIDDLEWARE` lo hace ruidoso primero (guard
@@ -199,7 +205,8 @@ promueven si aparece el disparador anotado.
 ## 5. Enmiendas documentales pendientes de commit
 
 **`docs/decisions/seed-data.md`** — tres filas quedaron desactualizadas
-respecto del código; marcarlas RESUELTO con referencia. **Verificado 2026-07-09: siguen sin aplicar en `main`** (S5 enmendó sus propias filas #1 y #2, estas tres siguen pendientes):
+respecto del código; marcarlas RESUELTO con referencia. **Verificado
+2026-07-14: siguen sin aplicar en `main`** (S5 enmendó sus propias filas #1 y #2, estas tres siguen pendientes):
 
 - **Gap #4**: la firma de `create_property` expone `title`, `description` y
   `location` desde la sesión de Decisión 3 (umbral operable vs. publicable).
@@ -215,6 +222,22 @@ respecto del código; marcarlas RESUELTO con referencia. **Verificado 2026-07-09
 **Nota de método para futuras reconciliaciones:** las tablas de severidad de
 `seed-data.md` son una foto de su sesión, no estado vivo. Todo gap listado
 ahí se cruza contra services y ADRs antes de darlo por abierto.
+
+**`docs/decisions/design/adr-design.md`** (línea ~865) — el "⚠️ Pendiente
+operativo antes de producción" del ADR "R2 — dos buckets por modelo de
+seguridad opuesto" quedó RESUELTO por la ventana de infra: buckets creados,
+custom domain `media.inmobiliariabricka.com` Active, r2.dev para dev,
+tokens scoped. Marcar con referencia a `infra.md`.
+
+**`docs/decisions/infra.md`** — el archivo en `main` registra la decisión
+DESCARTADA (`bricka.com.ar` vía nic.ar). Reemplazar por la versión
+actualizada entregada junto con esta enmienda (dominio existente en
+Namecheap, migración de zona, buckets, credenciales, CORS, pendientes con
+estado al 2026-07-14).
+
+**`docs/decisions/roadmap/roadmap.md`** — la enmienda 3 (cierre de S8)
+tampoco está commiteada en `main`; este archivo la incluye, alcanza con
+commitear esta versión.
 
 ---
 
@@ -256,4 +279,14 @@ ahí se cruza contra services y ADRs antes de darlo por abierto.
   deriva `backoffice_urls`/`apps/urls`). S8 era la sesión flotante: la
   ola 1 restante queda S1→S2→S3→S4, S6, S7, S9, S10 — el camino crítico
   R2→UI sigue siendo el frente abierto más largo.
-  
+- **2026-07-14 (enmienda 4)** — Ventana de preparativos de infra CERRADA.
+  Cambio de dominio: `inmobiliariabricka.com` (existente, Namecheap de los
+  socios) reemplaza a `bricka.com.ar`, que se descarta — activo existente +
+  titularidad resuelta + costo cero. Zona migrada a cuenta Cloudflare
+  propia; 4 buckets R2 operativos; tokens scoped por entorno; CORS dev.
+  Confirmados por los socios: 2FA ✔, dev como Administrator ✔, titularidad
+  Namecheap ✔; aviso a Tokko descartado por decisión. Confirmado: no queda
+  código sin pushear. **Gate de S1 destrabado** — S1 es la próxima sesión
+  natural y solo le falta poblar `.env` dev. Tareas de deploy de infra
+  absorbidas por S10. Diffs entregados: `adr-design.md` (⚠️ resuelto),
+  `infra.md` (reemplazo completo).
