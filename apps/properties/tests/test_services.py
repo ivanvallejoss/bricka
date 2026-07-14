@@ -229,6 +229,27 @@ class TestUploadPropertyMedia:
         )
         assert media.r2_key == r2_key
 
+    def test_becomes_cover_when_property_has_media_but_no_cover(self, db, actor):
+        prop = PropertyFactory()
+        PropertyMediaFactory(property=prop, is_cover=False, r2_key="media/huerfana.jpg")
+        media = upload_property_media(
+            property=prop,
+            r2_key="media/properties/test/nueva.jpg",
+            mime_type="image/jpeg",
+            actor=actor,
+        )
+        assert media.is_cover is True
+
+    def test_accepts_none_actor_as_system_action(self, db):
+        prop = PropertyFactory()
+        media = upload_property_media(
+            property=prop,
+            r2_key="media/properties/test/sistema.jpg",
+            mime_type="image/jpeg",
+            actor=None,
+        )
+        assert media.created_by is None
+
 
 class TestSetCoverMedia:
     def test_sets_cover_on_target(self, db):
@@ -270,6 +291,15 @@ class TestSetCoverMedia:
         cover_b.refresh_from_db()
         assert cover_b.is_cover is True
 
+    def test_keeps_single_cover_when_target_is_already_cover(self, db):
+        prop = PropertyFactory()
+        cover = PropertyMediaFactory(property=prop, is_cover=True, r2_key="media/c.jpg")
+        PropertyMediaFactory(property=prop, is_cover=False, r2_key="media/o.jpg")
+        set_cover_media(media=cover)
+        assert PropertyMedia.objects.filter(
+            property=prop, is_cover=True
+        ).count() == 1
+
 
 class TestDeletePropertyMedia:
     def test_hard_deletes_record(self, db):
@@ -277,6 +307,22 @@ class TestDeletePropertyMedia:
         media_pk = media.pk
         delete_property_media(media=media)
         assert not PropertyMedia.objects.filter(pk=media_pk).exists()
+
+    def test_deleting_cover_leaves_property_without_cover(self, db):
+        """
+        Pin de comportamiento actual, NO de comportamiento deseado:
+        el service no promueve otra foto a cover. Qué hacer con este
+        estado es decisión de S2 (deuda registrada en el cierre de S1).
+        Si este test rompe, alguien cambió la política — que sea a
+        propósito y actualice la deuda.
+        """
+        prop = PropertyFactory()
+        cover = PropertyMediaFactory(property=prop, is_cover=True, r2_key="media/c.jpg")
+        PropertyMediaFactory(property=prop, is_cover=False, r2_key="media/o.jpg")
+        delete_property_media(media=cover)
+        assert not PropertyMedia.objects.filter(
+            property=prop, is_cover=True
+        ).exists()
 
 
 class TestPropertyFeatures:
