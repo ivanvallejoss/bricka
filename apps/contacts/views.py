@@ -23,7 +23,7 @@ from apps.billing.selectors import get_recent_documents_for_contact
 
 from apps.contracts.selectors import get_contract_list, ContractFilters
 
-from apps.common.storage import generate_document_url
+from apps.common.storage import generate_document_download_url
 
 from apps.documents.selectors import get_document_list, DocumentFilters
 from apps.documents.context import DocumentContext
@@ -83,7 +83,7 @@ def contact_detail(request, contact_id):
     documents = [
         DocumentContext(
             document=doc,
-            signed_url=generate_document_url(doc.r2_key),
+            signed_url=generate_document_download_url(doc.r2_key),
             file_category=categorize_document(doc.content_type),
         )
         for doc in raw_documents

@@ -98,53 +98,14 @@ def upload_private_document(*, key: str, fileobj, content_type: str) -> None:
 def generate_document_download_url(key: str, *, expires_in: int = 300) -> str:
     """Presigned URL de corta vida (default 5 min). Se genera en el momento
     en que un humano abre el documento en el backoffice. Sirve sobre el
-    endpoint S3 de R2 — los documentos nunca van por custom domain."""
-    return _client().generate_presigned_url(
-        "get_object",
-        Params={"Bucket": settings.R2_PRIVATE_DOCS_BUCKET, "Key": key},
-        ExpiresIn=expires_in,
-    )
+    endpoint S3 de R2 — los documentos nunca van por custom domain.
+
+    ⚠️ Las presigned URLs no se cachean — cada render de la view genera
+    URLs nuevas. Si una vista lista muchos documentos y se vuelve lenta,
+    cachear a nivel de view con TTL < expires_in."""
 
 
 def delete_private_document(key: str) -> None:
     """Borra de R2. Lanza si falla — habilita el patrón 'R2 primero, DB después'
     documentado: si esto explota, el service nunca llega al delete de DB."""
     _client().delete_object(Bucket=settings.R2_PRIVATE_DOCS_BUCKET, Key=key)
-
-
-#
-#   OLD CONFIG
-#
-
-def generate_document_url(r2_key: str, expiration: int = 900) -> str:
-    """
-    URL de acceso a un documento legal.
-    Dev:  URL local via MEDIA_URL — no requiere credenciales R2.
-    Prod: signed URL de R2 con expiración (default 15 minutos).
-
-    ⚠️ Las signed URLs no se cachean — cada render de la view genera
-    URLs nuevas. Para vistas con muchos documentos, cachear a nivel
-    de view con TTL < ExpiresIn.
-
-    ExpiresIn=900: suficiente para abrir/descargar, corto para que
-    el link no circule si alguien lo copia.
-    """
-    if settings.DEBUG:
-        return f"{settings.MEDIA_URL}{r2_key}"
-    return _get_s3_client().generate_presigned_url(
-        "get_object",
-        Params={
-            "Bucket": settings.AWS_STORAGE_BUCKET_NAME,
-            "Key": r2_key,
-        },
-        ExpiresIn=expiration,
-    )
-
-
-def build_media_url(r2_key: str) -> str:
-    """
-    URL pública para media de propiedades (fotos, cover).
-    El bucket de media es público — no requiere firma.
-    Uso: foto cover en listado de propiedades, galería en detalle.
-    """
-    return f"{settings.R2_PUBLIC_BASE_URL}/{r2_key}"

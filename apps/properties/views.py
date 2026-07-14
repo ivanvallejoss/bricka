@@ -25,7 +25,7 @@ from apps.billing.selectors import (
     )
 from apps.billing.choices import PaymentStatus
 
-from apps.common.storage import build_media_url, generate_document_url
+from apps.common.storage import get_public_media_url, generate_document_download_url
 
 from apps.contracts.selectors import get_active_contract_for_property
 
@@ -71,7 +71,7 @@ def property_list(request):
     property_contexts = [
         PropertyListContext(
             property=prop,
-            cover_url=build_media_url(prop.cover_media_list[0].r2_key)
+            cover_url=get_public_media_url(prop.cover_media_list[0].r2_key)
             if prop.cover_media_list else None,
             display_price=next(
                 (l.price for l in prop.price_listings if not op_type or l.operation_type == op_type),
@@ -119,7 +119,7 @@ def property_slide_over(request, pk):
         raise Http404
 
     cover = prop.cover_media_list[0] if prop.cover_media_list else None
-    prop.cover_url = build_media_url(cover.r2_key) if cover else None
+    prop.cover_url = get_public_media_url(cover.r2_key) if cover else None
 
     listings = list(get_listings_for_property(pk))
 
@@ -186,7 +186,7 @@ def slide_over_documents(request, pk):
 
     documents = list(get_document_list(DocumentFilters(property_id=pk)))
     for doc in documents:
-        doc.signed_url    = generate_document_url(doc.r2_key)
+        doc.signed_url    = generate_document_download_url(doc.r2_key)
         doc.file_category = categorize_document(doc.content_type)
 
     return render(request, "properties/partials/_slide_over_documents.html", {
@@ -218,9 +218,9 @@ def property_detail(request, pk):
     cover_url = None
     if media_list:
         cover_media = next((m for m in media_list if m.is_cover), media_list[0])
-        cover_url = build_media_url(cover_media.r2_key)
+        cover_url = get_public_media_url(cover_media.r2_key)
 
-    gallery_urls = [build_media_url(m.r2_key) for m in media_list]
+    gallery_urls = [get_public_media_url(m.r2_key) for m in media_list]
     listings = list(get_listings_for_property(pk))
 
     return render(request, "properties/property_detail.html", {
@@ -255,7 +255,7 @@ def detail_documents(request, pk):
     contexts = [
         DocumentContext(
             document=doc,
-            signed_url=generate_document_url(doc.r2_key),
+            signed_url=generate_document_download_url(doc.r2_key),
             file_category=categorize_document(doc.content_type),
         )
         for doc in documents
