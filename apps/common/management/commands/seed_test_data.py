@@ -44,9 +44,10 @@ from apps.listings.services import (
     update_listing_status, update_publication_status,
 ) 
 
+from apps.common.storage import build_media_key
 from apps.properties.choices import PropertyType, PropertyStatus
 from apps.properties.models import ExternalPropertySource, Property, PropertyMedia
-from apps.properties.services import create_property
+from apps.properties.services import create_property, upload_property_media
 from apps.operations.services import withdraw_property
 
 _SENTINEL_USERNAME = "bricka_seed"
@@ -216,13 +217,34 @@ class Command(BaseCommand):
         )
 
 
+    def _media(self, *, prop, actor, count: int = 2) -> None:
+        """
+        Siembra PropertyMedia con keys sintéticas: formato real vía
+        build_media_key, SIN objeto en R2 (decisión S1: el seed corre en
+        CI y entornos sin credenciales — las <img> en dev renderizan
+        rotas hasta S3). Viola a propósito la precondición del service
+        ("r2_key ya subido"): no lo "arregles" subiendo archivos acá.
+        La primera foto queda cover por lógica del service, no del seed.
+        """
+        for i in range(count):
+            upload_property_media(
+                property=prop,
+                r2_key=build_media_key(
+                    property_id=prop.pk, filename=f"seed-{i}.jpg"
+                ),
+                mime_type="image/jpeg",
+                order=i,
+                actor=actor,
+            )
+
+
     # ── Clusters ───────────────────────────────────────────────────────
     def _cluster_a_al_dia(self, ctx):
         """
         Cluster A — Inmueble administrado al día.
         ACTIVE con ajuste ICL aplicado (current_price lo refleja), recibo del
         período → PAID cualquier día. Listing que rentó queda CLOSED con
-        historial de precio. Sin media (R2 no conectado).
+        historial de precio. Media sintética (keys sin objeto en R2).
         """
         self._step("Cluster A — administrado al día")
         actor, today, period = ctx["actor"], ctx["today"], ctx["period"]
@@ -256,6 +278,7 @@ class Command(BaseCommand):
             price=Decimal("320000.00"), currency=Currency.ARS,
             period=PricePeriod.MONTHLY, actor=actor,
         )
+        self._media(prop=prop, actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
         update_listing_price(listing=listing, price=Decimal("300000.00"), actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.CLOSED, actor=actor)
@@ -328,6 +351,7 @@ class Command(BaseCommand):
             price=Decimal("250000.00"), currency=Currency.ARS,
             period=PricePeriod.MONTHLY, actor=actor,
         )
+        self._media(prop=prop, actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.CLOSED, actor=actor)
 
@@ -503,6 +527,7 @@ class Command(BaseCommand):
             price=Decimal("120000.00"), currency=Currency.USD,
             period=PricePeriod.TOTAL, actor=actor,
         )
+        self._media(prop=prop, actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
 
         # Deal SALE sobre el listing → close WON → property SOLD.
@@ -574,6 +599,7 @@ class Command(BaseCommand):
             price=Decimal("160000.00"), currency=Currency.ARS,
             period=PricePeriod.MONTHLY, actor=actor,
         )
+        self._media(prop=prop, actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.PAUSED, actor=actor)
 
@@ -675,6 +701,7 @@ class Command(BaseCommand):
             price=Decimal("245000.00"), currency=Currency.ARS,
             period=PricePeriod.MONTHLY, actor=actor,
         )
+        self._media(prop=prop_term, actor=actor)
         update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
 
         return {
@@ -722,6 +749,7 @@ class Command(BaseCommand):
             price=Decimal("210000.00"), currency=Currency.ARS,
             period=PricePeriod.MONTHLY, actor=actor,
         )
+        self._media(prop=prop_ext, actor=actor)
         update_listing_status(listing=listing_ext, status=ListingStatus.PUBLISHED, actor=actor)
 
         # ── G2: Deal sobre propiedad no modelada ─────────────────────────
