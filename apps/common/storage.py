@@ -103,6 +103,11 @@ def generate_document_download_url(key: str, *, expires_in: int = 300) -> str:
     ⚠️ Las presigned URLs no se cachean — cada render de la view genera
     URLs nuevas. Si una vista lista muchos documentos y se vuelve lenta,
     cachear a nivel de view con TTL < expires_in."""
+    return _client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.R2_PRIVATE_DOCS_BUCKET, "Key": key},
+        ExpiresIn=expires_in,
+    )
 
 
 def delete_private_document(key: str) -> None:
