@@ -4,7 +4,7 @@ Documento vivo de la ventana de planificación. Criterio rector: ENTREGA —
 prioriza lo que el socio necesita pulido y estable para operar. Relegar un
 ítem a V1.1/V2 es una decisión escrita, no un olvido.
 
-**Última actualización:** 2026-07-14 (enmienda 4 — cierre de preparativos de infra)
+**Última actualización:** 2026-07-14 (enmienda 5 — cierre de S1)
 **Base verificada:** `main` como única fuente de verdad (todo commiteado
 salvo `.env`).
 
@@ -19,7 +19,7 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 
 | # | Ítem | Estado real verificado |
 | --- | --- | --- |
-| a1 | Upload de fotos / track R2 | Backend YA en `main`: `common/storage.py` completo (dos buckets, keys, presigned), `upload_property_media` / `set_cover_media` / `delete_property_media`, vars `R2_*` en settings. Falta: flujo UI→backend, reconciliar funciones duplicadas en `storage.py` (`get_public_media_url` vs `build_media_url`; `generate_document_download_url` vs `generate_document_url`), seed de `PropertyMedia`, tests. |
+| ~~a1~~ | ~~Upload de fotos / track R2~~ — **RESUELTO en S1 (2026-07-14)**: `storage.py` reconciliado a una sola generación (el bloque viejo nunca funcionó contra R2 — símbolos inexistentes en prod, URLs muertas en dev), 7 call sites migrados, settings sin fósiles, `.env` dev validado con round-trip real, seed EN VERDE con keys sintéticas (12 PropertyMedia, 6 covers, lógica de cover ejercida por el service), 12 tests de storage + 4 de services de media, `r2_smoke` como herramienta de ops. Ver `S1-r2-media.md`. Lo que queda del territorio es UI (S2/S3) | - |
 | a2 | UI creación/edición de properties | Decisión 4 pendiente; espec original no commiteada (ver b8). Services listos: `create_property` expone title/description/location (umbral operable, no publicable); `update_property` con sentinela UNSET. Decisiones abiertas: flujo de upload, captura de location, edición de externas. |
 | a3 | Celery | `config/celery.py` + settings existen; modelos `OutboundEvent`/`InboundEvent` diseñados para worker+beat+watchdog. Cero `tasks.py` en el repo. Alcance V1 decidido: solo lo que ZonaProp consume (ver §2, ola 2). |
 | a4 | Usuarios | Base existente: `User` custom (UUID, soft delete, managers) + grupos `socio`/`agente` por data migration. Pendiente: perfil (nombre/foto), asociaciones agente↔entidades, uso de roles en vistas. → V1.1 |
@@ -79,7 +79,7 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 
 ### V1 — ola 1: interno operable → HITO "socios testeando"
 
-~~Auth (a8)~~ **✔ S8** · Track R2/media (a1) · UI creación/edición (a2, b8, edición de
+~~Auth (a8)~~ **✔ S8** · ~~Track R2/media (a1)~~ **✔ S1** · UI creación/edición (a2, b8, edición de
 externas) · Superficie de operaciones de propiedad (b12) · ~~Billing operativo
 (b6, b5, comprobante PDF de c4)~~ **✔ S5** · Vista comercial (c2) · Home
 mínima (c3 reducida) · Observabilidad fase 1 (b3) · Puesta en producción.
@@ -126,16 +126,16 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 
 | # | Sesión | Tipo | Depende de | Decisiones |
 | --- | --- | --- | --- | --- |
-| S1 | Track R2/media: reconciliar duplicados de `storage.py`, verificar wiring contra buckets reales, sembrar `PropertyMedia` en seed (resuelve el rojo deliberado), tests | Implementación | ~~Buckets dev creados (infra)~~ **✔ cumplida (2026-07-14)** — falta solo poblar `.env` dev con el inventario de variables de `infra.md` (tokens en gestor de contraseñas) | Cerradas (ADRs en `adr-design.md`). Nueva: qué función de cada par duplicado sobrevive. Confirmado: no hay código sin pushear — `main` es todo |
-| S2 | Diseño UI creación/edición: re-derivar y commitear espec de Decisión 4 (salda b8); upload (orden/portada/validaciones), captura de location, edición de externas, ¿thumbnails? | Diseño | ADRs de S1 (puede solaparse con S1) | Las produce esta sesión |
-| S3 | Implementación UI creación/edición | Implementación | S1 + S2 | Las de S2 |
+| ~~S1~~ | **CERRADA (2026-07-14)** — Track R2/media completo (ver a1 y `S1-r2-media.md`). Hallazgo portable: R2 responde 400 (no 403) a GET sin firma — "S3-compatible" cubre la API firmada, no los bordes de error. Bonus: tercer fósil corregido en `docs/setup/development.md` | Cerrada | — | Todas cerradas y documentadas |
+| S2 | Diseño UI creación/edición: re-derivar y commitear espec de Decisión 4 (salda b8); upload (orden/portada/validaciones), captura de location, edición de externas, ¿thumbnails? **+ de S1: decisión UX de portada al borrar el cover** (hoy no promueve otra foto y la presentación es inconsistente — list sin imagen, detail con fallback; comportamiento pineado por test, cambiarlo debe ser deliberado) | Diseño | ~~ADRs de S1~~ ✔ — sin bloqueo, próxima sesión natural | Las produce esta sesión |
+| S3 | Implementación UI creación/edición. **+ de S1, opt-in solo si duele en dev:** flag `--with-r2-uploads` en el seed para placeholders visibles (hoy: keys sintéticas, `<img>` rotas en dev — trade-off asumido para que el seed corra en CI sin credenciales) | Implementación | ~~S1~~ ✔ + S2 | Las de S2 |
 | S4 | Superficie de operaciones de propiedad (b12): acciones retirar/reactivar en el detail (llaman `withdraw_property`/`restore_property`) + señal visible del listing de alquiler PAUSED post-venta | Mini diseño + implementación (ventana única) | Post-S3 (hereda patrones del detail); las decisiones de superficie pueden adelantarse a S2 si conviene | Backend cerrado y testeado; falta solo la decisión de presentación |
 | ~~S5~~ | **CERRADA (2026-07-09)** — Billing operativo: b6 ✔ (9 puntos + partial), b5 ✔ (selector + columna propiedad + 6 tests), c4 ✔ (display.py, pdf.py, endpoint, dos puntos de descarga, 12 tests). Bonus: CI reparado (requirements/dev.txt, ruff pinneado, libs WeasyPrint). 18 tests nuevos. Ver `s5-billing-operativo.md` | Cerrada | — | Todas cerradas y documentadas |
 | S6 | Vista comercial del detail (c2) | Diseño (relevar con el socio) → implementación | Post-S3 (hereda patrones) | Faltan; insumo = feedback del socio |
 | S7 | Home mínima: contratos por vencer (query request-time) + accesos. **+ de S8: repuntar `LOGIN_REDIRECT_URL` de `properties:list` (interim) a la home real** | Implementación con mini-diseño | Vistas previas (consistencia) | Casi cerradas por reducción de alcance |
 | ~~S8~~ | **CERRADA (2026-07-13)** — Auth completo (ver a8 y `S8-auth.md`). Roto a propósito: logout/password-change inexistentes en mobile (bottom nav 5/5; destino b9). 26 tests, suite verde | Cerrada | — | Todas cerradas y documentadas |
 | S9 | Observabilidad f1: upgrade SDK, init module, `before_send` | Implementación | — (justo antes de producción) | Diseño previo NO commiteado — la sesión deja el rationale en docs |
-| S10 | Puesta en producción — **HITO: socios testeando** | Implementación | Todas + infra (dominio ✔, Cloudflare ✔, Hetzner pendiente) | Falta: checklist deploy, settings prod, migración de datos reales. **De S8, ya decididos, activar acá:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_*` según config final de dominio. **De infra, ejecutar acá:** registro `app.` + proxy naranja, recambio del `A` raíz (sale Tokko, entra el CRM), CORS prod en `bricka-media` (origin `https://app.inmobiliariabricka.com`), IP filtering del token `bricka-app-prod` con la IP de Hetzner, cert de origen (Cloudflare origin cert o Let's Encrypt) |
+| S10 | Puesta en producción — **HITO: socios testeando** | Implementación | Todas + infra (dominio ✔, Cloudflare ✔, Hetzner pendiente) | Falta: checklist deploy, settings prod, migración de datos reales. **De S8, ya decididos, activar acá:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_*` según config final de dominio. **De infra, ejecutar acá:** registro `app.` + proxy naranja, recambio del `A` raíz (sale Tokko, entra el CRM), CORS prod en `bricka-media` (origin `https://app.inmobiliariabricka.com`), IP filtering del token `bricka-app-prod` con la IP de Hetzner, cert de origen (Cloudflare origin cert o Let's Encrypt). **De S1:** correr `r2_smoke` contra el `.env` prod (incluye el chequeo negativo de privacidad de documents) como parte del checklist |
 
 ### Ola 2
 
@@ -160,9 +160,13 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 
 ## 4. Estado conocido de cosas rotas a propósito
 
-- `seed_test_data` queda rojo en su primer publish (propiedades sin fotos).
-  Se resuelve en S1: sembrar `PropertyMedia` antes de los
-  `update_listing_status(→PUBLISHED)`.
+- ~~`seed_test_data` queda rojo en su primer publish~~ — **RESUELTO en S1**:
+  el seed siembra `PropertyMedia` (keys sintéticas) antes de los publish y
+  corre EN VERDE.
+- **`<img>` rotas en dev tras el seed** (S1): las keys son sintéticas, no
+  hay objeto en R2. Trade-off deliberado para que el seed corra en CI y
+  entornos sin credenciales. Remedio opt-in si duele: flag
+  `--with-r2-uploads` (S3).
 - Vars `R2_*` en settings son `env.str` sin default: sin `.env` poblado el
   proyecto no levanta. Deliberado (paridad dev/prod), pero es la primera
   pared de todo entorno nuevo.
@@ -227,17 +231,15 @@ ahí se cruza contra services y ADRs antes de darlo por abierto.
 operativo antes de producción" del ADR "R2 — dos buckets por modelo de
 seguridad opuesto" quedó RESUELTO por la ventana de infra: buckets creados,
 custom domain `media.inmobiliariabricka.com` Active, r2.dev para dev,
-tokens scoped. Marcar con referencia a `infra.md`.
+tokens scoped. Marcar con referencia a `infra.md`. **Verificado
+2026-07-14 post-S1: sigue sin aplicar.**
 
-**`docs/decisions/infra.md`** — el archivo en `main` registra la decisión
-DESCARTADA (`bricka.com.ar` vía nic.ar). Reemplazar por la versión
-actualizada entregada junto con esta enmienda (dominio existente en
-Namecheap, migración de zona, buckets, credenciales, CORS, pendientes con
-estado al 2026-07-14).
+~~**`docs/decisions/infra.md`**~~ — **COMMITEADO** (con la enmienda de S1:
+ganaron los nombres del código, `R2_PUBLIC_MEDIA_BUCKET` /
+`R2_PRIVATE_DOCS_BUCKET`).
 
-**`docs/decisions/roadmap/roadmap.md`** — la enmienda 3 (cierre de S8)
-tampoco está commiteada en `main`; este archivo la incluye, alcanza con
-commitear esta versión.
+~~**`docs/decisions/roadmap/roadmap.md`** — enmienda 3~~ — **COMMITEADO**
+(enmienda 4 en `main`).
 
 ---
 
@@ -290,3 +292,14 @@ commitear esta versión.
   natural y solo le falta poblar `.env` dev. Tareas de deploy de infra
   absorbidas por S10. Diffs entregados: `adr-design.md` (⚠️ resuelto),
   `infra.md` (reemplazo completo).
+- **2026-07-14 (enmienda 5)** — S1 CERRADA (verificado contra `main`:
+  `storage.py` en una sola generación, cero símbolos viejos, settings con
+  nombres nuevos de buckets, `r2_smoke`, seed con `PropertyMedia` vía
+  service, `test_storage.py`; `infra.md` y `development.md` reconciliados
+  en la misma sesión). a1 resuelto; el rojo del seed sale de §4 y entra el
+  trade-off de `<img>` rotas en dev. Herencias asignadas: decisión UX de
+  portada al borrar cover → S2; flag `--with-r2-uploads` opt-in → S3;
+  `r2_smoke` → checklist de S10. Hallazgo documentado: R2 devuelve 400 (no
+  403) a GET sin firma. **El camino crítico queda sin ningún bloqueo: S2 es
+  la próxima sesión y solo depende de sí misma.** Pendientes documentales
+  persistentes: `seed-data.md` #4/#6/#7 y ⚠️ de `adr-design.md`.
