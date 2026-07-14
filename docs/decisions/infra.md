@@ -146,12 +146,16 @@ token prod: pendiente, requiere IP de Hetzner (→ S10).
 | `R2_ENDPOINT_URL` | = | = | No | `https://<account_id>.r2.cloudflarestorage.com` |
 | `R2_ACCESS_KEY_ID` | token dev | token prod | Sí | Emisión del token (gestor de contraseñas) |
 | `R2_SECRET_ACCESS_KEY` | token dev | token prod | Sí | Ídem — irrecuperable, solo regenerable |
-| `R2_MEDIA_BUCKET` | `bricka-media-dev` | `bricka-media` | No | Este doc |
-| `R2_DOCUMENTS_BUCKET` | `bricka-documents-dev` | `bricka-documents` | No | Este doc |
+| `R2_PUBLIC_MEDIA_BUCKET` | `bricka-media-dev` | `bricka-media` | No | Este doc |
+| `R2_PRIVATE_DOCS_BUCKET` | `bricka-documents-dev` | `bricka-documents` | No | Este doc |
 | `R2_PUBLIC_MEDIA_BASE_URL` | `https://pub-<hash>.r2.dev` | `https://media.inmobiliariabricka.com` | No | Consola R2 / este doc |
 
-Nombres definitivos salvo veto de la ventana de código; los valores
-secretos jamás entran al repo ni a conversaciones.
+Nombres definitivos — la ventana de código (S1, 2026-07-14) ejerció el
+veto sobre los nombres de bucket: `R2_PUBLIC_MEDIA_BUCKET` /
+`R2_PRIVATE_DOCS_BUCKET`, porque el nombre debe cargar el modelo de
+seguridad (público/privado), misma convención que las funciones de
+`common/storage.py`. Los valores secretos jamás entran al repo ni a
+conversaciones.
 
 Nota de estado del código (verificado por planificación, 2026-07-14):
 `common/storage.py` y el wiring de services ya están en `main`; **no

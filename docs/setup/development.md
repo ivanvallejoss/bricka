@@ -191,16 +191,20 @@ por `gdal-config`.
 | `POSTGRES_PASSWORD` | Password de la DB (Docker) | `bricka` |
 | `REDIS_URL` | URL de conexión Redis | `redis://localhost:6379/0` |
 | `SENTRY_DSN` | DSN de Sentry | vacío — desactiva Sentry |
-| `R2_ACCESS_KEY_ID` | Cloudflare R2 key | vacío — usa filesystem local |
-| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 secret | vacío |
-| `R2_BUCKET_NAME` | Nombre del bucket R2 | vacío |
-| `R2_ENDPOINT_URL` | Endpoint R2 | vacío |
-| `R2_CUSTOM_DOMAIN` | Dominio CDN de R2 | vacío |
+| `R2_ACCOUNT_ID` | Account ID de Cloudflare | requerida |
+| `R2_ACCESS_KEY_ID` | Key del token R2 (dev: `bricka-app-dev`) | requerida |
+| `R2_SECRET_ACCESS_KEY` | Secret del mismo token | requerida |
+| `R2_ENDPOINT_URL` | `https://<account_id>.r2.cloudflarestorage.com` | requerida |
+| `R2_PUBLIC_MEDIA_BUCKET` | Bucket público de media (dev: `bricka-media-dev`) | requerida |
+| `R2_PRIVATE_DOCS_BUCKET` | Bucket privado de documentos (dev: `bricka-documents-dev`) | requerida |
+| `R2_PUBLIC_MEDIA_BASE_URL` | Base URL pública de media (dev: URL `r2.dev` del bucket) | requerida |
 
-**Storage en dev:** con las variables R2 vacías, Django usa
-`FileSystemStorage` — los archivos se guardan en `/media/` local.
-Este comportamiento está controlado por el bloque `if DEBUG` en
-`config/settings.py`.
+**Storage en dev:** R2 corre con la misma ruta de código en dev y prod
+(paridad por ADR); el aislamiento lo da el `.env` apuntando a los
+buckets `*-dev`. Las variables `R2_*` no tienen default: si falta una,
+el proyecto no levanta al arrancar — deliberado, para que el error sea
+de configuración y no una URL rota en runtime. Inventario completo de
+variables y su origen: `docs/decisions/infra.md`.
 
 **Sentry en dev:** con `SENTRY_DSN` vacío, el SDK no se inicializa.
 No hay tráfico hacia Sentry desde el entorno local.
