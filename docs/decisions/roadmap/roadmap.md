@@ -4,7 +4,7 @@ Documento vivo de la ventana de planificación. Criterio rector: ENTREGA —
 prioriza lo que el socio necesita pulido y estable para operar. Relegar un
 ítem a V1.1/V2 es una decisión escrita, no un olvido.
 
-**Última actualización:** 2026-07-14 (enmienda 5 — cierre de S1)
+**Última actualización:** 2026-07-15 (enmienda 6 — paquete de decisiones S2, partición S3a/S3b)
 **Base verificada:** `main` como única fuente de verdad (todo commiteado
 salvo `.env`).
 
@@ -19,8 +19,8 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 
 | # | Ítem | Estado real verificado |
 | --- | --- | --- |
-| ~~a1~~ | ~~Upload de fotos / track R2~~ — **RESUELTO en S1 (2026-07-14)**: `storage.py` reconciliado a una sola generación (el bloque viejo nunca funcionó contra R2 — símbolos inexistentes en prod, URLs muertas en dev), 7 call sites migrados, settings sin fósiles, `.env` dev validado con round-trip real, seed EN VERDE con keys sintéticas (12 PropertyMedia, 6 covers, lógica de cover ejercida por el service), 12 tests de storage + 4 de services de media, `r2_smoke` como herramienta de ops. Ver `S1-r2-media.md`. Lo que queda del territorio es UI (S2/S3) | - |
-| a2 | UI creación/edición de properties | Decisión 4 pendiente; espec original no commiteada (ver b8). Services listos: `create_property` expone title/description/location (umbral operable, no publicable); `update_property` con sentinela UNSET. Decisiones abiertas: flujo de upload, captura de location, edición de externas. |
+| ~~a1~~ | ~~Upload de fotos / track R2~~ — **RESUELTO en S1 (2026-07-14)**: `storage.py` reconciliado a una sola generación (el bloque viejo nunca funcionó contra R2 — símbolos inexistentes en prod, URLs muertas en dev), 7 call sites migrados, settings sin fósiles, `.env` dev validado con round-trip real, seed EN VERDE con keys sintéticas (12 PropertyMedia, 6 covers, lógica de cover ejercida por el service), 12 tests de storage + 4 de services de media, `r2_smoke` como herramienta de ops. Ver `S1-r2-media.md`. Lo que queda del territorio es UI (S2/S3) | |
+| a2 | UI creación/edición de properties | **Paquete de decisiones S2 producido (2026-07-15)**: wizard de 4 fases con persistencia por fase, edición como página de secciones-partials autocontenidos, upload presigned PUT browser→R2 con confirmación verificada (`head_object`), resize client-side >2000px, Leaflet+Nominatim vía proxy propio, features visibles con contador, `update_external_source` nuevo, gate 5 fotos/150 caracteres con constantes exportadas. **S2 NO cerrada: falta verificación contra `main` + commit de la espec — b8 se salda con ese commit.** |
 | a3 | Celery | `config/celery.py` + settings existen; modelos `OutboundEvent`/`InboundEvent` diseñados para worker+beat+watchdog. Cero `tasks.py` en el repo. Alcance V1 decidido: solo lo que ZonaProp consume (ver §2, ola 2). |
 | a4 | Usuarios | Base existente: `User` custom (UUID, soft delete, managers) + grupos `socio`/`agente` por data migration. Pendiente: perfil (nombre/foto), asociaciones agente↔entidades, uso de roles en vistas. → V1.1 |
 | a5 | ZonaProp | `portal/models.py` vacío; `integrations` solo modelos de eventos. ADR de token Navent (Redis) cerrado. Todo el cableado por hacer. → V1 ola 2 (decisión de producto). |
@@ -43,7 +43,9 @@ repo — gap no visto · **(c)** solo en la lista — sin registro en el repo.
 | b9 | Logo de agencia: `r2_key` sin modelo de configuración. Desde S5 es también el futuro dueño de los campos `AGENCY_*` del membrete (hoy en settings vía env, single-tenant) | V1.1 |
 | b10 | Testing pendiente histórico (ContactForm.clean, signals audit before/after, views HTMX) + `storage.py` sin tests | Tests de cada track dentro del track; cola histórica → V1.1 |
 | b11 | Numeración de billing incompatible AFIP (gaps por `nextval()`) | V2 — decisión explícita: V1 entrega comprobantes internos no fiscales |
-| b12 | **Superficie de operaciones de propiedad** (sustituye a b1/b4): ninguna view llama `withdraw_property` / `restore_property` — retirar/reactivar no se puede hacer desde el backoffice; y el listing de alquiler que queda PAUSED tras una venta (`settle_won_sale`) no tiene señal visible para el agente. Alcance de UI, no de coherencia de dominio | V1 ola 1 (S4 redefinida) |
+| b12 | **Superficie de operaciones de propiedad** (sustituye a b1/b4): ninguna view llama `withdraw_property` / `restore_property` — retirar/reactivar no se puede hacer desde el backoffice; y el listing de alquiler que queda PAUSED tras una venta (`settle_won_sale`) no tiene señal visible para el agente. Alcance de UI, no de coherencia de dominio. **Diseño CERRADO por adelantado en el paquete S2 (§8)**: acciones en sidebar del detail, visibilidad por estado, form nativo + two-step, badge "Pausada", checklist del gate compartido | V1 ola 1 (S4, reducida a implementación) |
+| b13 | **`create_listing` sin ningún consumidor de UI** (solo seed y operations) — sin superficie de creación/publicación de listings, en producción no habría precios ni filtros venta/alquiler. Agujero sin nombre destapado por la verificación del paquete S2; **crítico para S10**. Absorbido por la espec: fase 4 del wizard + sección "Operación" de la edición (§8) | V1 ola 1 (S3b) |
+| b13 | **`create_listing` sin consumidor de UI** — descubierto en la verificación del paquete S2 (2026-07-15): sin superficie de creación/publicación de listings, en producción no habría precios ni filtros venta/alquiler. Agujero que ninguna lista ni reconciliación previa nombró; crítico para S10. Absorbido por el alcance de S2/S3 (fase 4 del wizard + sección "Operación" de la edición) | V1 ola 1 (S2/S3) |
 
 ### (c) — Solo en la lista: a registrar
 
@@ -99,7 +101,10 @@ separador de miles, jerarquías, membrete definitivo — natural encadenarla
 con la validación de S6) · **Compartir comprobante** (forma técnica ya
 definida en `adr-frontend.md`; requiere Celery, disponible desde ola 2) ·
 **Search de cobros sobre propiedad de comisiones** (deuda de S5: el camino
-deal→listing/notas queda fuera del filtro actual) · **Reset de password por
+deal→listing/notas queda fuera del filtro actual) · **Command de
+reconciliación de huérfanos en R2** (deuda del paquete S2: PUT exitoso sin
+confirmación deja objeto sin fila en DB — listar y borrar con umbral de
+antigüedad; candidato natural a task Celery en ola 2) · **Reset de password por
 email** (deuda de S8; consumidor de la infra de mail/Celery) · **Links de
 invitación** (deuda de S8: socio genera link con grupo embebido vía
 `TimestampSigner`, entrega por WhatsApp sin mail; frontera V1.1/V2 —
@@ -127,11 +132,12 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 | # | Sesión | Tipo | Depende de | Decisiones |
 | --- | --- | --- | --- | --- |
 | ~~S1~~ | **CERRADA (2026-07-14)** — Track R2/media completo (ver a1 y `S1-r2-media.md`). Hallazgo portable: R2 responde 400 (no 403) a GET sin firma — "S3-compatible" cubre la API firmada, no los bordes de error. Bonus: tercer fósil corregido en `docs/setup/development.md` | Cerrada | — | Todas cerradas y documentadas |
-| S2 | Diseño UI creación/edición: re-derivar y commitear espec de Decisión 4 (salda b8); upload (orden/portada/validaciones), captura de location, edición de externas, ¿thumbnails? **+ de S1: decisión UX de portada al borrar el cover** (hoy no promueve otra foto y la presentación es inconsistente — list sin imagen, detail con fallback; comportamiento pineado por test, cambiarlo debe ser deliberado) | Diseño | ~~ADRs de S1~~ ✔ — sin bloqueo, próxima sesión natural | Las produce esta sesión |
-| S3 | Implementación UI creación/edición. **+ de S1, opt-in solo si duele en dev:** flag `--with-r2-uploads` en el seed para placeholders visibles (hoy: keys sintéticas, `<img>` rotas en dev — trade-off asumido para que el seed corra en CI sin credenciales) | Implementación | ~~S1~~ ✔ + S2 | Las de S2 |
-| S4 | Superficie de operaciones de propiedad (b12): acciones retirar/reactivar en el detail (llaman `withdraw_property`/`restore_property`) + señal visible del listing de alquiler PAUSED post-venta | Mini diseño + implementación (ventana única) | Post-S3 (hereda patrones del detail); las decisiones de superficie pueden adelantarse a S2 si conviene | Backend cerrado y testeado; falta solo la decisión de presentación |
+| S2 | **EN MARCHA** — paquete de decisiones producido (2026-07-15): decisiones 1–8 + espec operativa + 6 cambios de services/gate especificados. Restan los pasos de cierre: la ventana S2 re-verifica §0 contra `main`, valida cada decisión contra el código (frena ante contradicción), cierra detalles finos y **commitea la espec — b8 se salda con ese commit**. Sin código de producción | Diseño (cierre) | — | Tomadas en planificación, pendientes de verificación |
+| S3a | Implementación "lo que carga": wizard fases 1–3 + form escalar de edición + sección de fotos completa (presigned sign/confirm/reorder/delete con promoción de cover, resize client-side, dos capas visuales) + services §10.1–10.4 + **constantes del gate (5/150) con actualización del seed EN EL MISMO COMMIT** (hoy siembra 2 fotos por propiedad — subir a ≥5 y verificar descripciones ≥150, si no el seed vuelve a rojo sin registro) + `loading="lazy"`/`decoding="async"` en listas + registro de Leaflet en `frontend.md` si entra acá. **Opt-in de S1 si duele:** flag `--with-r2-uploads` | Implementación | Commit de S2 | Las del paquete §1, §3, §5, §7, §10.1–4, §10.6 |
+| S3b | Implementación "lo que publica + completitud": fase 4 y sección "Operación" (b13: `create_listing` + publicar + precio), **checklist navegable del gate como partial compartido** (única presentación para todo rechazo), bloque location (Leaflet + proxy `/geo/geocode/`), bloque externas (`update_external_source`, §10.5) | Implementación | S3a | Las del paquete §2, §4, §6, §8-listing, §9, §10.5 |
+| S4 | Superficie de operaciones (b12): **implementación pura del §8 del paquete** — retirar/reactivar en sidebar con two-step, badge "Pausada" post-venta, rechazo de reactivación vía el checklist compartido | Implementación | S3b (reusa el checklist y los patrones del detail) | Cerradas en §8 (a confirmar en el cierre de S2) |
 | ~~S5~~ | **CERRADA (2026-07-09)** — Billing operativo: b6 ✔ (9 puntos + partial), b5 ✔ (selector + columna propiedad + 6 tests), c4 ✔ (display.py, pdf.py, endpoint, dos puntos de descarga, 12 tests). Bonus: CI reparado (requirements/dev.txt, ruff pinneado, libs WeasyPrint). 18 tests nuevos. Ver `s5-billing-operativo.md` | Cerrada | — | Todas cerradas y documentadas |
-| S6 | Vista comercial del detail (c2) | Diseño (relevar con el socio) → implementación | Post-S3 (hereda patrones) | Faltan; insumo = feedback del socio |
+| S6 | Vista comercial del detail (c2). **Insumos del paquete S2:** (a) decidir si el detail comercial convive con la página de edición operativa o la absorbe (re-layout barato por la regla de partials autocontenidos); (b) regla heredada: la comisión vive en superficies operativas, nunca en mostrables | Diseño (relevar con el socio) → implementación | Post-S3a/S3b (hereda patrones) | Faltan; insumo = feedback del socio |
 | S7 | Home mínima: contratos por vencer (query request-time) + accesos. **+ de S8: repuntar `LOGIN_REDIRECT_URL` de `properties:list` (interim) a la home real** | Implementación con mini-diseño | Vistas previas (consistencia) | Casi cerradas por reducción de alcance |
 | ~~S8~~ | **CERRADA (2026-07-13)** — Auth completo (ver a8 y `S8-auth.md`). Roto a propósito: logout/password-change inexistentes en mobile (bottom nav 5/5; destino b9). 26 tests, suite verde | Cerrada | — | Todas cerradas y documentadas |
 | S9 | Observabilidad f1: upgrade SDK, init module, `before_send` | Implementación | — (justo antes de producción) | Diseño previo NO commiteado — la sesión deja el rationale en docs |
@@ -142,7 +148,7 @@ durante la ola 1** (única dependencia externa que puede mover la fecha final).
 | # | Sesión | Tipo | Depende de | Decisiones |
 | --- | --- | --- | --- | --- |
 | S11 | Celery mínimo: worker + `OutboundEvent` + watchdog beat | Implementación con mini-diseño | Redis (existe) | Casi cerradas — docstrings de `integrations/models.py` son la espec |
-| S12 | Diseño ZonaProp: contrato del handler, mapeo features→portal, errores/reintentos vía `OutboundEvent` | Diseño | Credenciales Navent (⚠️ tramitar en ola 1) | ADR token cerrado; el resto lo produce esta sesión |
+| S12 | Diseño ZonaProp: contrato del handler, mapeo features→portal, errores/reintentos vía `OutboundEvent`. **Heredado del paquete S2:** verificar techo de 35 fotos ≤ límite real del portal; decidir si ZonaProp exige coordenadas → posible suma de `location` al gate | Diseño | Credenciales Navent (⚠️ tramitar en ola 1) | ADR token cerrado; el resto lo produce esta sesión |
 | S13 | Implementación ZonaProp | Implementación | S11 + S12 + credenciales | Las de S12 |
 | S14 | Vista de publicaciones + sección portales de Home | Diseño + implementación | S13 (recién ahí se sabe qué devuelve el portal) | Faltan; insumo lo genera S13 |
 | — | **HITO: entrega completa** | | | |
@@ -303,3 +309,17 @@ ganaron los nombres del código, `R2_PUBLIC_MEDIA_BUCKET` /
   403) a GET sin firma. **El camino crítico queda sin ningún bloqueo: S2 es
   la próxima sesión y solo depende de sí misma.** Pendientes documentales
   persistentes: `seed-data.md` #4/#6/#7 y ⚠️ de `adr-design.md`.
+- **2026-07-15 (enmienda 6)** — Paquete de decisiones S2 producido; S2
+  queda EN MARCHA (cierra con verificación contra `main` + commit de la
+  espec; **b8 se salda recién ahí**). b13 registrado (`create_listing` sin
+  consumidor de UI — agujero crítico para S10, absorbido por la espec).
+  **S3 se parte en S3a ("lo que carga") → S3b ("lo que publica y
+  completa")** — el alcance creció (wizard + secciones + presigned + 6
+  cambios de services + Leaflet + listings) y el corte es limpio porque
+  los bloques son partials autocontenidos por regla de la espec; el
+  checklist del gate vive en S3b y S4 lo reusa → secuencia S3a→S3b→S4.
+  S4 pasa a implementación pura del §8. **Trampa detectada por
+  planificación:** el gate nuevo (≥5 fotos) rompe el seed de S1 (siembra
+  2 por propiedad) — la actualización del seed va EN EL MISMO COMMIT que
+  las constantes (asignado a S3a). Herencias a S12: techo de 35 fotos y
+  coordenadas-en-gate. Command de huérfanos R2 a V1.1.
