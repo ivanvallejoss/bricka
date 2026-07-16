@@ -386,21 +386,50 @@ class TestDeletePropertyMedia:
         delete_property_media(media=media)
         assert not PropertyMedia.objects.filter(pk=media_pk).exists()
 
-    def test_deleting_cover_leaves_property_without_cover(self, db):
-        """
-        Pin de comportamiento actual, NO de comportamiento deseado:
-        el service no promueve otra foto a cover. Qué hacer con este
-        estado es decisión de S2 (deuda registrada en el cierre de S1).
-        Si este test rompe, alguien cambió la política — que sea a
-        propósito y actualice la deuda.
-        """
+    def test_deleting_cover_promotes_first_by_order(self, db):
         prop = PropertyFactory()
-        cover = PropertyMediaFactory(property=prop, is_cover=True, r2_key="media/c.jpg")
-        PropertyMediaFactory(property=prop, is_cover=False, r2_key="media/o.jpg")
+        cover = PropertyMediaFactory(property=prop, is_cover=True, order=0, r2_key="media/c.jpg")
+        second = PropertyMediaFactory(property=prop, is_cover=False, order=1, r2_key="media/s.jpg")
+        PropertyMediaFactory(property=prop, is_cover=False, order=2, r2_key="media/t.jpg")
+
         delete_property_media(media=cover)
-        assert not PropertyMedia.objects.filter(
-            property=prop, is_cover=True
-        ).exists()
+
+        second.refresh_from_db()
+        assert second.is_cover is True
+        assert PropertyMedia.objects.filter(property=prop, is_cover=True).count() == 1
+
+    def test_promotes_by_order_not_by_insertion(self, db):
+        prop = PropertyFactory()
+        cover = PropertyMediaFactory(property=prop, is_cover=True, order=0, r2_key="media/c.jpg")
+        later_order = PropertyMediaFactory(property=prop, is_cover=False, order=2, r2_key="media/b.jpg")
+        earlier_order = PropertyMediaFactory(property=prop, is_cover=False, order=1, r2_key="media/a.jpg")
+
+        delete_property_media(media=cover)
+
+        earlier_order.refresh_from_db()
+        later_order.refresh_from_db()
+        assert earlier_order.is_cover is True
+        assert later_order.is_cover is False
+
+    def test_deleting_non_cover_keeps_existing_cover(self, db):
+        prop = PropertyFactory()
+        cover = PropertyMediaFactory(property=prop, is_cover=True, order=0, r2_key="media/c.jpg")
+        other = PropertyMediaFactory(property=prop, is_cover=False, order=1, r2_key="media/o.jpg")
+
+        delete_property_media(media=other)
+
+        cover.refresh_from_db()
+        assert cover.is_cover is True
+        assert PropertyMedia.objects.filter(property=prop, is_cover=True).count() == 1
+
+    def test_deleting_last_photo_leaves_no_cover(self, db):
+        prop = PropertyFactory()
+        cover = PropertyMediaFactory(property=prop, is_cover=True, order=0, r2_key="media/c.jpg")
+
+        delete_property_media(media=cover)
+
+        assert not PropertyMedia.objects.filter(property=prop).exists()
+        assert not PropertyMedia.objects.filter(property=prop, is_cover=True).exists()
 
 
 class TestPropertyFeatures:
