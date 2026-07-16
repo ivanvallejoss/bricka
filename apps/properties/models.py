@@ -151,6 +151,6 @@ class PropertyMedia(TimestampModel):
     )
 
     class Meta:
-        ordering = ["order"]
+        ordering = ["order", "created_at"]
         verbose_name = "archivo multimedia"
         verbose_name_plural = "archivos multimedia"
