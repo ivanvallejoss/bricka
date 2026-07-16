@@ -273,9 +273,30 @@ def reorder_property_media(
 
 def delete_property_media(*, media: PropertyMedia) -> None:
     """
-    Hard delete del registro en DB.
+    Hard delete del registro en DB, con promoción de portada.
+
     PRECONDICIÓN: el caller ya eliminó el archivo de R2 exitosamente.
     El orden de operaciones (R2 primero, DB después) es responsabilidad
     de la view — este service asume que R2 ya fue limpiado.
+
+    Si la foto borrada era la portada y quedan otras, la primera por
+    `order` (desempate por `created_at`) hereda is_cover en la misma
+    transacción. Cierra la deuda de S1: se descartó el estado "con fotos
+    y sin portada" — inconsistencia sin valor operativo (lista sin imagen,
+    detail con fallback).
     """
-    media.delete()
+    was_cover = media.is_cover
+    property_id = media.property_id
+
+    with transaction.atomic():
+        media.delete()
+
+        if was_cover:
+            heir = (
+                PropertyMedia.objects.filter(property_id=property_id)
+                .order_by("order", "created_at")
+                .first()
+            )
+            if heir is not None:
+                heir.is_cover = True
+                heir.save(update_fields=["is_cover"])
