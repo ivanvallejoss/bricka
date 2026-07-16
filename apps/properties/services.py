@@ -10,6 +10,20 @@ from apps.properties.models import ExternalPropertySource, Property, PropertyMed
 from apps.properties.exceptions import PropertyValidationError
 
 
+# Límites de media de una propiedad. Dominio de properties (capacidad del
+# archivo), distinto del gate de publicación (MIN_PHOTOS_TO_PUBLISH, en
+# listings). La UI importa MAX_PHOTOS_PER_PROPERTY para el contador "máx 35";
+# las views de sign/confirm lo aplican como techo — una sola fuente.
+MAX_PHOTOS_PER_PROPERTY = 35
+MAX_MEDIA_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB, post-resize
+MEDIA_MIME_EXTENSIONS = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+ALLOWED_MEDIA_MIME_TYPES = frozenset(MEDIA_MIME_EXTENSIONS)
+
+
 def _resolve_features(slugs: list[str]) -> list[Feature]:
     """
     Traduce slugs a filas de Feature con validación estricta.
