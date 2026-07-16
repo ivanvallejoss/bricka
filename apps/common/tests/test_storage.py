@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+from botocore.exceptions import ClientError
 
 from apps.common import storage
 from apps.common.storage import (
@@ -13,7 +14,9 @@ from apps.common.storage import (
     delete_private_document,
     delete_public_media,
     generate_document_download_url,
+    generate_media_upload_url,
     get_public_media_url,
+    public_media_exists,
     upload_private_document,
     upload_public_media,
 )
@@ -148,3 +151,56 @@ class TestDeletes:
         stub_client.delete_object.side_effect = RuntimeError("boom")
         with pytest.raises(RuntimeError):
             delete_public_media("properties/x/y.jpg")
+
+
+class TestGenerateMediaUploadUrl:
+    def test_signs_put_with_content_type_in_signature(self, stub_client, r2_settings):
+        stub_client.generate_presigned_url.return_value = "https://signed.test/put"
+        url = generate_media_upload_url(
+            key="properties/x/y.jpg", content_type="image/jpeg"
+        )
+        stub_client.generate_presigned_url.assert_called_once_with(
+            "put_object",
+            Params={
+                "Bucket": "media-test",
+                "Key": "properties/x/y.jpg",
+                "ContentType": "image/jpeg",
+            },
+            ExpiresIn=300,
+        )
+        assert url == "https://signed.test/put"
+
+    def test_respects_custom_expiration(self, stub_client, r2_settings):
+        generate_media_upload_url(
+            key="properties/x/y.jpg", content_type="image/jpeg", expires_in=120
+        )
+        _, kwargs = stub_client.generate_presigned_url.call_args
+        assert kwargs["ExpiresIn"] == 120
+
+
+class TestPublicMediaExists:
+    @staticmethod
+    def _head_error(status: int) -> ClientError:
+        return ClientError(
+            {
+                "Error": {"Code": str(status), "Message": "x"},
+                "ResponseMetadata": {"HTTPStatusCode": status},
+            },
+            "HeadObject",
+        )
+
+    def test_returns_true_when_object_exists(self, stub_client, r2_settings):
+        stub_client.head_object.return_value = {"ContentLength": 123}
+        assert public_media_exists("properties/x/y.jpg") is True
+        stub_client.head_object.assert_called_once_with(
+            Bucket="media-test", Key="properties/x/y.jpg"
+        )
+
+    def test_returns_false_when_object_missing(self, stub_client, r2_settings):
+        stub_client.head_object.side_effect = self._head_error(404)
+        assert public_media_exists("properties/x/missing.jpg") is False
+
+    def test_propagates_non_404_client_error(self, stub_client, r2_settings):
+        stub_client.head_object.side_effect = self._head_error(403)
+        with pytest.raises(ClientError):
+            public_media_exists("properties/x/forbidden.jpg")
