@@ -14,4 +14,5 @@ urlpatterns = [
     path("<uuid:pk>/", views.property_detail, name="detail"), 
     path("<uuid:pk>/publications/", views.detail_publication, name="detail_publication"),
     path("<uuid:pk>/documents/", views.detail_documents, name="detail_documents"),
+    path("<uuid:pk>/media/sign/", views.media_sign, name="media_sign"),
 ]
