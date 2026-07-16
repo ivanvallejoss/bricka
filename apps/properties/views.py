@@ -8,12 +8,16 @@ from django.core.paginator import Paginator
 
 from urllib.parse import urlencode
 
-from .models import Property
+from .models import Property, PropertyMedia
 from .services import (
     ALLOWED_MEDIA_MIME_TYPES,
     MAX_MEDIA_SIZE_BYTES,
     MAX_PHOTOS_PER_PROPERTY,
     MEDIA_MIME_EXTENSIONS,
+    media_mime_type_from_key,
+    upload_property_media,
+    set_cover_media,
+    delete_property_media,
 )
 from .selectors import (
     PropertyFilters, 
@@ -22,7 +26,7 @@ from .selectors import (
     get_property_detail,
     get_properties_for_search,
     )
-from .contexts import BadgeContext, PropertyListContext
+from .contexts import BadgeContext, PropertyListContext, MediaItemContext
 
 from apps.billing.selectors import (
     get_rental_payment_status, 
@@ -36,6 +40,8 @@ from apps.common.storage import (
     generate_document_download_url,
     build_media_key,
     generate_media_upload_url,
+    public_media_exists,
+    delete_public_media,
 )
 
 from apps.contracts.selectors import get_active_contract_for_property
@@ -45,6 +51,7 @@ from apps.documents.context import DocumentContext
 from apps.documents.utils import categorize_document
 
 from apps.listings.selectors import get_listings_for_property
+from apps.listings.services import MIN_PHOTOS_TO_PUBLISH
 
 
 _BADGE_MAP = {
@@ -343,3 +350,129 @@ def media_sign(request, pk):
     )
     url = generate_media_upload_url(key=key, content_type=content_type)
     return JsonResponse({"key": key, "url": url})
+
+
+def _gate_context(property):
+    return {
+        "photo_count": property.media.count(),
+        "min_photos": MIN_PHOTOS_TO_PUBLISH,
+        "max_photos": MAX_PHOTOS_PER_PROPERTY,
+    }
+
+
+def _media_item_context(media):
+    return MediaItemContext(
+        id=media.id,
+        url=get_public_media_url(media.r2_key),
+        is_cover=media.is_cover,
+        order=media.order,
+    )
+
+
+def _media_confirm_response(request, property, media):
+    return render(request, "properties/partials/_media_confirm_response.html", {
+        "item": _media_item_context(media),
+        **_gate_context(property),
+    })
+
+
+def _media_gallery_response(request, property):
+    return render(request, "properties/partials/_media_gallery.html", {
+        "media_items": [_media_item_context(m) for m in property.media.all()],
+        **_gate_context(property),
+    })
+
+
+def media_confirm(request, pk):
+    """
+    Confirma una subida (§9): verifica que el objeto llegó a R2
+    (public_media_exists, §10.2) antes de registrar PropertyMedia, y
+    devuelve el card de la foto (beforeend a la galería) + el contador de
+    gate por OOB swap.
+
+    Éxito → HTML (presentación de estado persistido). Fallo → JSON (dato
+    para que el cliente marque la foto fallida y ofrezca reintento). Ver
+    criterio del ADR de frontend.
+
+    El mime lo deriva de la extensión de la key (que el server generó en
+    sign). La key se valida contra el prefijo de la propiedad: nunca se
+    registra acá un objeto de otra propiedad.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Cuerpo inválido."}, status=400)
+
+    key = payload.get("key") or ""
+    mime_type = media_mime_type_from_key(key)
+
+    if not key.startswith(f"properties/{property.pk}/") or mime_type is None:
+        return JsonResponse({"error": "Key inválida."}, status=400)
+
+    existing = PropertyMedia.objects.filter(r2_key=key).first()
+    if existing is not None:
+        return _media_confirm_response(request, property, existing)
+
+    if property.media.count() >= MAX_PHOTOS_PER_PROPERTY:
+        return JsonResponse(
+            {"error": f"Llegaste al máximo de {MAX_PHOTOS_PER_PROPERTY} fotos."},
+            status=409,
+        )
+
+    if not public_media_exists(key):
+        return JsonResponse(
+            {"error": "La foto no llegó a subirse. Reintentá."},
+            status=422,
+        )
+
+    media = upload_property_media(
+        property=property,
+        r2_key=key,
+        mime_type=mime_type,
+        order=property.media.count(),
+        actor=request.user,
+    )
+    return _media_confirm_response(request, property, media)
+
+
+def media_set_cover(request, id):
+    """
+    Marca una foto como portada (§9). set_cover_media es atómico (§10):
+    apaga la portada previa y prende esta. Devuelve la galería re-renderizada
+    con la verdad nueva — el frontend no calcula la posición del badge.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        media = PropertyMedia.objects.select_related("property").get(pk=id)
+    except PropertyMedia.DoesNotExist:
+        raise Http404
+    set_cover_media(media=media)
+    return _media_gallery_response(request, media.property)
+
+
+def media_delete(request, id):
+    """
+    Borra una foto (§9): R2 primero (delete_public_media lanza si falla, así
+    la fila de DB nunca queda huérfana), DB después (delete_property_media con
+    promoción de portada, §10.4). Devuelve la galería re-renderizada: si se
+    borró la portada, ya trae la promovida — el frontend no decide nada.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        media = PropertyMedia.objects.select_related("property").get(pk=id)
+    except PropertyMedia.DoesNotExist:
+        raise Http404
+    property = media.property
+    delete_public_media(media.r2_key)
+    delete_property_media(media=media)
+    return _media_gallery_response(request, property)
