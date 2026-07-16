@@ -15,4 +15,7 @@ urlpatterns = [
     path("<uuid:pk>/publications/", views.detail_publication, name="detail_publication"),
     path("<uuid:pk>/documents/", views.detail_documents, name="detail_documents"),
     path("<uuid:pk>/media/sign/", views.media_sign, name="media_sign"),
+    path("<uuid:pk>/media/confirm/", views.media_confirm, name="media_confirm"),
+    path("media/<uuid:id>/set-cover/", views.media_set_cover, name="media_set_cover"),
+    path("media/<uuid:id>/delete/", views.media_delete, name="media_delete"),
 ]
