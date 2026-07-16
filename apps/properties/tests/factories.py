@@ -16,10 +16,17 @@ class PropertyFactory(factory.django.DjangoModelFactory):
         # El default de la factory sigue siendo "operable, no publicable" —
         # el trait se pide explícito donde el test va a publicar.
         publishable = factory.Trait(
-            description="Descripción de prueba para publicación.",
-            gate_media=factory.RelatedFactory(
+            # Descripción ≥150 chars + 5 fotos: satisface el gate 5/150 (S3a).
+            description=(
+                "Departamento de dos ambientes al frente, muy luminoso, con "
+                "balcón corrido, cocina integrada equipada, piso de parquet y "
+                "excelente ventilación cruzada. A metros del transporte y "
+                "comercios. Ideal para vivienda o renta. Apto crédito."
+            ),
+            gate_media=factory.RelatedFactoryList(
                 "apps.properties.tests.factories.PropertyMediaFactory",
                 factory_related_name="property",
+                size=5,
             ),
         )
 

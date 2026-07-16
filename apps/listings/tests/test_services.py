@@ -319,7 +319,14 @@ class TestPublicationGate:
         assert listing.status == ListingStatus.DRAFT
 
     def test_rejects_without_photos(self, db, actor):
-        prop = PropertyFactory(description="Completa y publicable.")
+        prop = PropertyFactory(
+            description=(
+                "Casa de tres dormitorios con patio, cochera para dos autos, "
+                "living comedor amplio, cocina independiente con office y "
+                "lavadero cubierto. Muy buena ubicación, sobre calle asfaltada "
+                "y a pocas cuadras de escuelas y comercios."
+            )
+        )
         listing = ListingFactory(property=prop, status=ListingStatus.DRAFT)
         with pytest.raises(ListingPublicationRequirementsError) as exc:
             update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
