@@ -1,5 +1,6 @@
 from decimal import Decimal
 from uuid import UUID
+from pathlib import PurePosixPath
 
 from django.db import transaction
 from django.contrib.gis.geos import Point
@@ -22,6 +23,16 @@ MEDIA_MIME_EXTENSIONS = {
     "image/webp": ".webp",
 }
 ALLOWED_MEDIA_MIME_TYPES = frozenset(MEDIA_MIME_EXTENSIONS)
+MEDIA_EXTENSION_MIME_TYPES = {ext: mime for mime, ext in MEDIA_MIME_EXTENSIONS.items()}
+
+
+def media_mime_type_from_key(key: str) -> str | None:
+    """Deriva el mime de la extensión de la key. None si la extensión no
+    corresponde a un tipo permitido. La key la generó el server en sign,
+    así que su extensión ya refleja el mime validado — esto la re-lee, no
+    confía en un mime declarado por el cliente en confirm."""
+    ext = PurePosixPath(key).suffix.lower()
+    return MEDIA_EXTENSION_MIME_TYPES.get(ext)
 
 
 def _resolve_features(slugs: list[str]) -> list[Feature]:

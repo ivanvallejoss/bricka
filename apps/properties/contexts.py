@@ -1,3 +1,4 @@
+from uuid import UUID
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -14,3 +15,10 @@ class PropertyListContext:
     cover_url: str | None
     display_price: Decimal | None
     contextual_badge: BadgeContext | None = None
+
+@dataclass
+class MediaItemContext:
+    id: UUID
+    url: str
+    is_cover: bool
+    order: int
