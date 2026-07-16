@@ -42,7 +42,8 @@ from apps.listings.models import Listing, ListingPriceHistory, ListingPublicatio
 from apps.listings.services import (
     create_listing, create_listing_publication, update_listing_price,
     update_listing_status, update_publication_status,
-) 
+    MIN_PHOTOS_TO_PUBLISH,
+)
 
 from apps.common.storage import build_media_key
 from apps.properties.choices import PropertyType, PropertyStatus
@@ -217,7 +218,7 @@ class Command(BaseCommand):
         )
 
 
-    def _media(self, *, prop, actor, count: int = 2) -> None:
+    def _media(self, *, prop, actor, count: int = MIN_PHOTOS_TO_PUBLISH) -> None:
         """
         Siembra PropertyMedia con keys sintéticas: formato real vía
         build_media_key, SIN objeto en R2 (decisión S1: el seed corre en
@@ -225,6 +226,11 @@ class Command(BaseCommand):
         rotas hasta S3). Viola a propósito la precondición del service
         ("r2_key ya subido"): no lo "arregles" subiendo archivos acá.
         La primera foto queda cover por lógica del service, no del seed.
+
+        count arranca en MIN_PHOTOS_TO_PUBLISH: toda propiedad sembrada que
+        se publique tiene que superar el gate 5/150. Atado a la constante
+        (no un 5 hardcodeado) para que suba solo si el gate sube — si no,
+        el seed volvería a rojo en silencio.
         """
         for i in range(count):
             upload_property_media(
@@ -263,7 +269,9 @@ class Command(BaseCommand):
         prop = create_property(
             title="Departamento 3 ambientes — Centro",
             description=("Luminoso 3 ambientes sobre la peatonal, cocina "
-                         "equipada y balcón a la plaza. Portería y ascensor."),
+                         "equipada y balcón a la plaza. Portería y ascensor. Tres "
+                         "dormitorios, dos baños completos y living comedor con muy buena "
+                         "luz natural. A pasos de bancos, comercios y transporte."),
             location=self._point("centro"),
             property_type=PropertyType.APARTMENT,
             address_line="Justo XII 250, Piso 4, Dpto. B",
@@ -335,7 +343,9 @@ class Command(BaseCommand):
         prop = create_property(
             title="Casa 3 dormitorios — Villa del Parque",
             description=("Casa familiar con patio y garaje para dos autos. "
-                         "Living comedor amplio, tres dormitorios, lavadero."),
+                         "Living comedor amplio, tres dormitorios, lavadero. Cocina "
+                         "independiente, baño completo y patio con espacio para quincho. "
+                         "Barrio residencial y tranquilo, cercano a escuelas y avenidas."),
             location=self._point("villa_del_parque"),
             property_type=PropertyType.HOUSE,
             address_line="Av. 25 de Mayo 1840",
@@ -510,7 +520,9 @@ class Command(BaseCommand):
         prop = create_property(
             title="Casa 4 dormitorios — Barrio Norte",
             description=("Casa sobre lote propio, cuatro dormitorios, quincho "
-                         "con parrilla y cochera doble. Lista para escriturar."),
+                         "con parrilla y cochera doble. Lista para escriturar. Amplios "
+                         "espacios comunes, dos baños completos y fondo con parque. "
+                         "Construcción sólida de 2012 en zona residencial consolidada."),
             location=self._point("barrio_norte"),
             property_type=PropertyType.HOUSE,
             address_line="López y Planes 1560",
@@ -583,7 +595,9 @@ class Command(BaseCommand):
         prop = create_property(
             title="Departamento 1 ambiente — Güemes",
             description=("Monoambiente a estrenar, cocina americana, ideal "
-                         "inversión o estudiante. Disponible desde el mes próximo."),
+                         "inversión o estudiante. Disponible desde el mes próximo. Ambiente "
+                         "único bien distribuido, baño completo y muy buena luminosidad. "
+                         "Edificio nuevo, a metros de la universidad y el transporte."),
             location=self._point("guemes"),
             property_type=PropertyType.APARTMENT,
             address_line="Güemes 380, Piso 1, Dpto. C",
@@ -673,7 +687,9 @@ class Command(BaseCommand):
         prop_term = create_property(
             title="Casa 2 dormitorios — Villa Forestación",
             description=("Casa con patio y cochera. Dos dormitorios, living "
-                         "comedor con cocina integrada."),
+                         "comedor con cocina integrada. Baño completo, lavadero y patio con "
+                         "espacio verde. Barrio arbolado y tranquilo, a pocas cuadras de "
+                         "comercios y transporte. En muy buen estado de conservación."),
             location=self._point("villa_forestacion"),
             property_type=PropertyType.HOUSE,
             address_line="Pellegrini 1490",
@@ -730,7 +746,9 @@ class Command(BaseCommand):
         prop_ext = create_property(
             title="Departamento 2 ambientes — Villa Libertad (externa)",
             description=("Dos ambientes en pozo avanzado, co-publicado con "
-                         "Inmobiliaria del Litoral. Comisión compartida."),
+                         "Inmobiliaria del Litoral. Comisión compartida. Unidad al frente con "
+                         "balcón, cocina integrada al living y dormitorio amplio. Entrega "
+                         "estimada próxima, apta inversión. Sobre avenida, muy conectada."),
             location=self._point("villa_libertad"),
             property_type=PropertyType.APARTMENT,
             address_line="Av. Castelli 1820, Piso 5, Dpto. B",
