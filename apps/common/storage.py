@@ -22,6 +22,7 @@ from uuid import UUID, uuid4
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from django.conf import settings
 
 
@@ -62,6 +63,61 @@ def upload_public_media(*, key: str, fileobj, content_type: str) -> None:
         key,
         ExtraArgs={"ContentType": content_type},
     )
+
+
+def generate_media_upload_url(
+    *, key: str, content_type: str, expires_in: int = 300
+) -> str:
+    """Presigned PUT de corta vida (default 5 min) para subir una foto
+    directo del browser a R2, sin pasar por Django.
+
+    ContentType va DENTRO de la firma: boto3 lo agrega a los SignedHeaders
+    de SigV4, así que R2 acepta el PUT solo si el header Content-Type del
+    browser coincide EXACTO con content_type. Un cliente que declare otro
+    tipo produce SignatureDoesNotMatch (403) — el MIME que el server validó
+    es el único que R2 acepta.
+
+    No valida los bytes: liga el Content-Type declarado, no lo infiere del
+    contenido. La certeza de que el objeto llegó la da el head_object del
+    confirm (public_media_exists), no esta firma.
+
+    Precondición: el caller (view de sign) ya validó MIME/tamaño/techo y,
+    si hubo resize, content_type ya es el del archivo final."""
+    return _client().generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": settings.R2_PUBLIC_MEDIA_BUCKET,
+            "Key": key,
+            "ContentType": content_type,
+        },
+        ExpiresIn=expires_in,
+    )
+
+
+def public_media_exists(key: str) -> bool:
+    """head_object contra el bucket público: ¿el objeto ya está subido?
+
+    Es la precondición del confirm — antes de registrar PropertyMedia, el
+    server verifica que el PUT del browser realmente llegó a R2, en vez de
+    confiar en que el cliente dice "lo subí".
+
+    Semántica de errores (el fino de esta función):
+      - 404 → el objeto no está → False. Es el único "no" legítimo: el
+        confirm lo lee como "la foto falló" y la marca para reintento.
+      - cualquier otro ClientError (403 de credenciales, red, 5xx) PROPAGA.
+        No es ausencia, es un problema real del server; tragarlo como False
+        haría que un token vencido se vea igual que un upload que nunca
+        ocurrió, y el usuario reintentaría contra una pared invisible.
+
+    HEAD no trae body, así que el status HTTP es la señal autoritativa:
+    Error.Code varía entre implementaciones S3-compatibles, el status no."""
+    try:
+        _client().head_object(Bucket=settings.R2_PUBLIC_MEDIA_BUCKET, Key=key)
+        return True
+    except ClientError as exc:
+        if exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return False
+        raise
 
 
 def get_public_media_url(key: str) -> str:
