@@ -3,12 +3,18 @@ import json
 from datetime import date
 
 from django.shortcuts import render
-from django.http import Http404
+from django.http import Http404, HttpResponseNotAllowed, JsonResponse
 from django.core.paginator import Paginator
 
 from urllib.parse import urlencode
 
 from .models import Property
+from .services import (
+    ALLOWED_MEDIA_MIME_TYPES,
+    MAX_MEDIA_SIZE_BYTES,
+    MAX_PHOTOS_PER_PROPERTY,
+    MEDIA_MIME_EXTENSIONS,
+)
 from .selectors import (
     PropertyFilters, 
     get_property_list, 
@@ -25,7 +31,12 @@ from apps.billing.selectors import (
     )
 from apps.billing.choices import PaymentStatus
 
-from apps.common.storage import get_public_media_url, generate_document_download_url
+from apps.common.storage import (
+    get_public_media_url,
+    generate_document_download_url,
+    build_media_key,
+    generate_media_upload_url,
+)
 
 from apps.contracts.selectors import get_active_contract_for_property
 
@@ -279,3 +290,56 @@ def property_search(request):
     return render(request, "properties/partials/_search_results.html", {
         "results": get_properties_for_search(q),
     })
+
+
+def media_sign(request, pk):
+    """
+    Firma una subida de foto (§9): re-valida MIME/tamaño/techo declarados
+    por el browser, construye la key y devuelve {key, url} para el PUT
+    directo a R2.
+
+    Primer endpoint JSON del backoffice: la subida es un flujo AJAX (fetch),
+    no una navegación HTMX, así que devuelve datos estructurados y el
+    frontend es dueño de presentar el error por archivo. Ver ADR de frontend.
+
+    La extensión de la key la deriva el server del MIME validado, no del
+    filename del cliente: la key siempre refleja el archivo final (§7).
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Cuerpo inválido."}, status=400)
+
+    content_type = payload.get("content_type")
+    size = payload.get("size")
+
+    if content_type not in ALLOWED_MEDIA_MIME_TYPES:
+        return JsonResponse(
+            {"error": "Formato no permitido. Usá JPG, PNG o WebP."},
+            status=400,
+        )
+    if not isinstance(size, int) or size <= 0 or size > MAX_MEDIA_SIZE_BYTES:
+        return JsonResponse(
+            {"error": "La foto supera el máximo de 10 MB."},
+            status=400,
+        )
+    if property.media.count() >= MAX_PHOTOS_PER_PROPERTY:
+        return JsonResponse(
+            {"error": f"Llegaste al máximo de {MAX_PHOTOS_PER_PROPERTY} fotos."},
+            status=409,
+        )
+
+    key = build_media_key(
+        property_id=property.pk,
+        filename=f"upload{MEDIA_MIME_EXTENSIONS[content_type]}",
+    )
+    url = generate_media_upload_url(key=key, content_type=content_type)
+    return JsonResponse({"key": key, "url": url})
