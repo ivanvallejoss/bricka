@@ -1,0 +1,20 @@
+{% comment %}
+Galería de edición — capa permanente server-owned (§3). Target de swap de
+set-cover y delete (cada render sale de DB completa → siempre consistente).
+La cola de subida (dropzone + filas spinner/tick/cruz/reintento) es una capa
+aparte, Alpine-owned, que vive en la página host y el server nunca swapea.
+Contexto: media_items (lista de MediaItemContext), photo_count, min_photos,
+max_photos.
+{% endcomment %}
+<div id="media-gallery" class="flex flex-col gap-3">
+    {% if media_items %}
+    <div class="grid grid-cols-3 md:grid-cols-4 gap-2">
+        {% for item in media_items %}
+            {% include "properties/partials/_media_item.html" %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-on-surface-variant">Sin fotos cargadas.</p>
+    {% endif %}
+    {% include "properties/partials/_media_gate_counter.html" %}
+</div>

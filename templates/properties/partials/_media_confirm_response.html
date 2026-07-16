@@ -1,0 +1,8 @@
+{% comment %}
+Response de confirm: card de la foto (hx-swap="beforeend" a la grid) +
+contador de gate por OOB. El card es el contenido primario (sin OOB); el
+contador lleva oob=True. Reusa los mismos includes que la galería — cero
+markup duplicado.
+{% endcomment %}
+{% include "properties/partials/_media_item.html" %}
+{% include "properties/partials/_media_gate_counter.html" with oob=True %}

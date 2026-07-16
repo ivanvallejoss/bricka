@@ -1,0 +1,12 @@
+{% comment %}
+Contador del gate de publicación — capa permanente (§3). Include compartido:
+- embebido en _media_gallery.html (render normal).
+- renderizado standalone en el response de confirm con oob=True (OOB swap).
+El id y el hx-swap-oob viven en el MISMO nodo raíz.
+Contexto: photo_count, min_photos, max_photos, oob (bool, default falsy).
+{% endcomment %}
+<p id="media-gate-counter"
+   {% if oob %}hx-swap-oob="true"{% endif %}
+   class="text-xs {% if photo_count >= min_photos %}text-success-text{% else %}text-on-surface-variant{% endif %}">
+    {{ photo_count }}/{{ min_photos }} mínimo publicable · máx {{ max_photos }}
+</p>

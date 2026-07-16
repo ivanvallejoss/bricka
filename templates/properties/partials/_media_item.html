@@ -1,0 +1,43 @@
+{% comment %}
+Card de una foto en la galería de edición. item: MediaItemContext
+(id, url, is_cover, order). Controles con hx-post nativo (el card lo inserta
+HTMX — sin Alpine sobre él, per ADR). Ambos controles apuntan a #media-gallery
+con outerHTML: set-cover y delete devuelven la galería entera con la verdad
+server-decided. El handle de reorden se suma en el paso de interacciones.
+{% endcomment %}
+<div class="group relative aspect-square rounded-md overflow-hidden bg-surface-container border border-outline"
+     data-media-id="{{ item.id }}">
+    <img src="{{ item.url }}" loading="lazy" decoding="async"
+         class="w-full h-full object-cover">
+
+    {% if item.is_cover %}
+    <span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium
+                 bg-primary text-on-primary">
+        Portada
+    </span>
+    {% endif %}
+
+    <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 p-1.5
+                bg-linear-to-t from-primary/70 to-transparent
+                opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+        {% if not item.is_cover %}
+        <button type="button"
+                hx-post="{% url 'properties:media_set_cover' item.id %}"
+                hx-target="#media-gallery" hx-swap="outerHTML"
+                class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface/90 text-on-surface
+                       hover:bg-surface transition-colors">
+            Hacer portada
+        </button>
+        {% else %}
+        <span></span>
+        {% endif %}
+        <button type="button"
+                hx-post="{% url 'properties:media_delete' item.id %}"
+                hx-target="#media-gallery" hx-swap="outerHTML"
+                hx-confirm="¿Eliminar esta foto?"
+                class="p-1 rounded bg-surface/90 text-danger-text hover:bg-surface transition-colors"
+                aria-label="Eliminar foto">
+            {% include "icons/x.html" with size="14" %}
+        </button>
+    </div>
+</div>
