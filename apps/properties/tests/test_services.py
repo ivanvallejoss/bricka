@@ -13,6 +13,7 @@ from apps.properties.services import (
     archive_property,
     create_property,
     delete_property_media,
+    reorder_property_media,
     set_cover_media,
     update_property,
     upload_property_media,
@@ -299,6 +300,83 @@ class TestSetCoverMedia:
         assert PropertyMedia.objects.filter(
             property=prop, is_cover=True
         ).count() == 1
+
+
+class TestReorderPropertyMedia:
+    def test_reorders_to_requested_positions(self, db, actor):
+        prop = PropertyFactory()
+        a = PropertyMediaFactory(property=prop, r2_key="media/a.jpg")
+        b = PropertyMediaFactory(property=prop, r2_key="media/b.jpg")
+        c = PropertyMediaFactory(property=prop, r2_key="media/c.jpg")
+
+        reorder_property_media(
+            property=prop,
+            ordered_media_ids=[c.pk, a.pk, b.pk],
+            actor=actor,
+        )
+
+        a.refresh_from_db()
+        b.refresh_from_db()
+        c.refresh_from_db()
+        assert (c.order, a.order, b.order) == (0, 1, 2)
+
+    def test_rejects_incomplete_set_and_writes_nothing(self, db, actor):
+        prop = PropertyFactory()
+        a = PropertyMediaFactory(property=prop, order=0, r2_key="media/a.jpg")
+        b = PropertyMediaFactory(property=prop, order=1, r2_key="media/b.jpg")
+        c = PropertyMediaFactory(property=prop, order=2, r2_key="media/c.jpg")
+
+        with pytest.raises(PropertyValidationError):
+            reorder_property_media(
+                property=prop,
+                ordered_media_ids=[b.pk, a.pk],  # falta c
+                actor=actor,
+            )
+
+        a.refresh_from_db()
+        b.refresh_from_db()
+        c.refresh_from_db()
+        assert (a.order, b.order, c.order) == (0, 1, 2)
+
+    def test_rejects_foreign_id(self, db, actor):
+        prop = PropertyFactory()
+        a = PropertyMediaFactory(property=prop, r2_key="media/a.jpg")
+        b = PropertyMediaFactory(property=prop, r2_key="media/b.jpg")
+        foreign = PropertyMediaFactory(r2_key="media/foreign.jpg")  # otra propiedad
+
+        with pytest.raises(PropertyValidationError):
+            reorder_property_media(
+                property=prop,
+                ordered_media_ids=[a.pk, foreign.pk],  # b reemplazada por ajena
+                actor=actor,
+            )
+
+    def test_rejects_duplicate_id(self, db, actor):
+        prop = PropertyFactory()
+        a = PropertyMediaFactory(property=prop, r2_key="media/a.jpg")
+        b = PropertyMediaFactory(property=prop, r2_key="media/b.jpg")
+
+        with pytest.raises(PropertyValidationError):
+            reorder_property_media(
+                property=prop,
+                ordered_media_ids=[a.pk, a.pk],  # duplicada, b ausente
+                actor=actor,
+            )
+
+    def test_accepts_none_actor_as_system_action(self, db):
+        prop = PropertyFactory()
+        a = PropertyMediaFactory(property=prop, r2_key="media/a.jpg")
+        b = PropertyMediaFactory(property=prop, r2_key="media/b.jpg")
+
+        reorder_property_media(
+            property=prop,
+            ordered_media_ids=[b.pk, a.pk],
+            actor=None,
+        )
+
+        a.refresh_from_db()
+        b.refresh_from_db()
+        assert (b.order, a.order) == (0, 1)        
 
 
 class TestDeletePropertyMedia:
