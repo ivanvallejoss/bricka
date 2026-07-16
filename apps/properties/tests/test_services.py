@@ -494,3 +494,15 @@ class TestPropertyFeatures:
         feature.save(update_fields=["is_active"])
         update_property(property=prop, city="Corrientes", actor=actor)
         assert list(prop.features.values_list("slug", flat=True)) == ["balcon"]
+
+
+class TestPropertyMediaOrdering:
+    def test_ties_in_order_break_by_created_at(self, db):
+        prop = PropertyFactory()
+        older = PropertyMediaFactory(property=prop, order=0, r2_key="media/older.jpg")
+        PropertyMediaFactory(property=prop, order=0, r2_key="media/newer.jpg")
+        PropertyMedia.objects.filter(pk=older.pk).update(
+            created_at=timezone.now() - datetime.timedelta(hours=1)
+        )
+        keys = list(prop.media.values_list("r2_key", flat=True))
+        assert keys == ["media/older.jpg", "media/newer.jpg"]
