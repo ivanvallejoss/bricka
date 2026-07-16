@@ -234,6 +234,43 @@ def set_cover_media(*, media: PropertyMedia) -> PropertyMedia:
     return media
 
 
+def reorder_property_media(
+    *,
+    property: Property,
+    ordered_media_ids: list[UUID],
+    actor: User,
+) -> None:
+    """
+    Reemplazo total del `order` de las fotos de una propiedad.
+
+    ordered_media_ids debe coincidir EXACTAMENTE con las fotos de la
+    propiedad: mismo conjunto, sin faltantes, sin ajenas, sin repetidas.
+    Cualquier desajuste rechaza sin escribir nada — un reorden es una
+    permutación del set existente, nunca una alta o baja encubierta.
+
+    Escribe solo `order`, vía bulk_update. NO toca updated_at: PropertyMedia
+    se reemplaza, no se edita (mismo criterio que set_cover_media). actor
+    viaja por uniformidad de la puerta de services; el modelo no tiene
+    updated_by donde registrarlo.
+    """
+    media = list(PropertyMedia.objects.filter(property_id=property.pk))
+    real_ids = {m.pk for m in media}
+    requested = list(ordered_media_ids)
+
+    if len(requested) != len(real_ids) or set(requested) != real_ids:
+        raise PropertyValidationError(
+            "El orden debe listar exactamente las fotos de la propiedad, "
+            "sin faltantes ni repetidas."
+        )
+
+    by_id = {m.pk: m for m in media}
+    for position, media_id in enumerate(requested):
+        by_id[media_id].order = position
+
+    with transaction.atomic():
+        PropertyMedia.objects.bulk_update(media, ["order"])
+
+
 def delete_property_media(*, media: PropertyMedia) -> None:
     """
     Hard delete del registro en DB.
