@@ -10,6 +10,12 @@ from .models import Listing, ListingPriceHistory, ListingPublication
 from apps.properties.models import Property
 
 
+# Requisitos del gate de publicación. Fuente única de estos números: la UI
+# los importa desde acá (contadores, checklist) — no se duplican en templates.
+MIN_PHOTOS_TO_PUBLISH = 5
+MIN_DESCRIPTION_LENGTH = 150
+
+
 def create_listing(
     *,
     property: Property,
@@ -88,15 +94,18 @@ def _publication_requirements_missing(property: Property) -> list[str]:
     la implementación vive acá porque publicar es un acto del listing).
     Invariante: nada incompleto llega a estado público.
 
-    v1: descripción no vacía + al menos una foto.
+    v2 (S3a): descripción ≥ MIN_DESCRIPTION_LENGTH caracteres (post-strip)
+    + ≥ MIN_PHOTOS_TO_PUBLISH fotos. Las constantes se exportan y la UI las
+    importa (contadores, checklist) — una sola fuente de números. Los códigos
+    ('description' / 'photos') no cambian: el contrato con la UI se mantiene.
     - area_m2 queda FUERA a propósito: un gate uniforme bloquearía
       publicar una cochera sin m². Extensión futura por property_type.
     - price no se chequea: create_listing lo exige y el modelo es NOT NULL.
     """
     missing = []
-    if not property.description.strip():
+    if len(property.description.strip()) < MIN_DESCRIPTION_LENGTH:
         missing.append("description")
-    if not property.media.exists():
+    if property.media.count() < MIN_PHOTOS_TO_PUBLISH:
         missing.append("photos")
     return missing
 
