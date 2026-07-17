@@ -199,3 +199,61 @@ class TestMediaDelete:
         media = PropertyMediaFactory(r2_key="properties/x/a.jpg")
         resp = auth_client.get(self._url(media))
         assert resp.status_code == 405
+
+
+class TestMediaReorder:
+    def _url(self, prop):
+        return reverse("properties:media_reorder", kwargs={"pk": prop.pk})
+
+    def _post(self, client, prop, ids):
+        return client.post(
+            self._url(prop),
+            data=json.dumps({"ordered_ids": ids}),
+            content_type="application/json",
+        )
+
+    def test_reorders_returns_204(self, auth_client, db):
+        prop = PropertyFactory()
+        a = PropertyMediaFactory(property=prop, order=0, r2_key=f"properties/{prop.pk}/a.jpg")
+        b = PropertyMediaFactory(property=prop, order=1, r2_key=f"properties/{prop.pk}/b.jpg")
+        resp = self._post(auth_client, prop, [str(b.id), str(a.id)])
+        assert resp.status_code == 204
+        a.refresh_from_db()
+        b.refresh_from_db()
+        assert (b.order, a.order) == (0, 1)
+
+    def test_stale_set_resyncs_gallery_without_writing(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        a = PropertyMediaFactory(property=prop, order=0, r2_key=f"properties/{prop.pk}/a.jpg")
+        b = PropertyMediaFactory(property=prop, order=1, r2_key=f"properties/{prop.pk}/b.jpg")
+        resp = self._post(auth_client, prop, [str(a.id)])  # falta b (borrado concurrente)
+        assert resp.status_code == 200
+        assert b'id="media-gallery"' in resp.content
+        a.refresh_from_db()
+        b.refresh_from_db()
+        assert (a.order, b.order) == (0, 1)
+
+    def test_malformed_body_returns_400(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = self._post(auth_client, prop, "not-a-list")
+        assert resp.status_code == 400
+
+    def test_requires_post(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.get(self._url(prop))
+        assert resp.status_code == 405
+
+
+class TestPropertyEdit:
+    def test_renders_edit_page_with_gallery_and_uploader(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        PropertyMediaFactory(property=prop, r2_key=f"properties/{prop.pk}/a.jpg")
+        resp = auth_client.get(reverse("properties:edit", kwargs={"pk": prop.pk}))
+        assert resp.status_code == 200
+        assert b'id="media-gallery"' in resp.content
+        assert b'id="media-grid"' in resp.content
+        assert b"mediaUploader(" in resp.content
+
+    def test_404_on_missing_property(self, auth_client, db):
+        resp = auth_client.get(reverse("properties:edit", kwargs={"pk": uuid4()}))
+        assert resp.status_code == 404
