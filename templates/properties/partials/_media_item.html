@@ -1,14 +1,17 @@
 {% comment %}
 Card de una foto en la galería de edición. item: MediaItemContext
-(id, url, is_cover, order). Controles con hx-post nativo (el card lo inserta
-HTMX — sin Alpine sobre él, per ADR). Ambos controles apuntan a #media-gallery
-con outerHTML: set-cover y delete devuelven la galería entera con la verdad
-server-decided. El handle de reorden se suma en el paso de interacciones.
+(id, url, is_cover, order). Controles portada/borrado con hx-post (HTMX).
+Reorden por DELEGACIÓN: el card expone data-media-id + draggable + botones
+con data-move; los eventos los maneja mediaReorder en el wrapper de la galería.
+Sin directivas Alpine por-card — no sobreviven a la inserción por HTMX.
+El <img> tiene drag y pointer-events apagados para no secuestrar el del card.
 {% endcomment %}
-<div class="group relative aspect-square rounded-md overflow-hidden bg-surface-container border border-outline"
-     data-media-id="{{ item.id }}">
-    <img src="{{ item.url }}" loading="lazy" decoding="async"
-         class="w-full h-full object-cover">
+<div class="group relative aspect-square rounded-md overflow-hidden bg-surface-container border border-outline
+            cursor-grab active:cursor-grabbing"
+     data-media-id="{{ item.id }}"
+     draggable="true">
+    <img src="{{ item.url }}" loading="lazy" decoding="async" draggable="false"
+         class="w-full h-full object-cover pointer-events-none">
 
     {% if item.is_cover %}
     <span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium
@@ -18,24 +21,41 @@ server-decided. El handle de reorden se suma en el paso de interacciones.
     {% endif %}
 
     <div class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 p-1.5
-                bg-linear-to-t from-primary/70 to-transparent
+                bg-gradient-to-t from-primary/85 via-primary/40 to-transparent
                 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+
+        {# Subir/bajar — solo mobile (desktop usa drag) #}
+        <div class="flex items-center gap-1 md:hidden">
+            <button type="button" data-move="up"
+                    class="p-1 rounded bg-primary/90 text-on-primary hover:bg-primary transition-colors"
+                    aria-label="Subir">
+                {% include "icons/chevron-up.html" with size="14" %}
+            </button>
+            <button type="button" data-move="down"
+                    class="p-1 rounded bg-primary/90 text-on-primary hover:bg-primary transition-colors"
+                    aria-label="Bajar">
+                {% include "icons/chevron-down.html" with size="14" %}
+            </button>
+        </div>
+
         {% if not item.is_cover %}
         <button type="button"
                 hx-post="{% url 'properties:media_set_cover' item.id %}"
                 hx-target="#media-gallery" hx-swap="outerHTML"
-                class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface/90 text-on-surface
-                       hover:bg-surface transition-colors">
+                class="px-2 py-1 rounded text-[10px] font-medium
+                       bg-primary/90 text-on-primary hover:bg-primary transition-colors">
             Hacer portada
         </button>
         {% else %}
         <span></span>
         {% endif %}
+
         <button type="button"
                 hx-post="{% url 'properties:media_delete' item.id %}"
                 hx-target="#media-gallery" hx-swap="outerHTML"
                 hx-confirm="¿Eliminar esta foto?"
-                class="p-1 rounded bg-surface/90 text-danger-text hover:bg-surface transition-colors"
+                class="p-1.5 rounded bg-primary/90 text-on-primary
+                       hover:bg-error hover:text-on-error transition-colors"
                 aria-label="Eliminar foto">
             {% include "icons/x.html" with size="14" %}
         </button>

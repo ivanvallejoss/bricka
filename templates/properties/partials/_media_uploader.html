@@ -1,0 +1,313 @@
+{% comment %}
+Cola de subida — capa efímera Alpine-owned (§3). El server nunca la swapea.
+Resize local (§7: lado mayor máx 2000px → JPEG 0.85) → sube directo a R2
+(sign → PUT → confirm) → appendea el card a #media-grid; confirm hace el
+beforeend + contador OOB, procesados por htmx.swap. Una fila por archivo con
+estado (pending→resizing→uploading→done/error): spinner→tick (se retira) /
+cruz+reintentar. Reorden → 4d.
+Config inyectada por el host: URLs (reverse) + csrf token + selector de grid.
+resizeMaxDim/jpegQuality/allowedMimes/maxSizeBytes son client-only (§3, §7):
+el server revalida igual en sign; el JS los usa para rechazo temprano.
+{% endcomment %}
+<div x-data="mediaUploader({
+        signUrl: '{% url 'properties:media_sign' property.pk %}',
+        confirmUrl: '{% url 'properties:media_confirm' property.pk %}',
+        reorderUrl: '{% url 'properties:media_reorder' property.pk %}',
+        csrfToken: '{{ csrf_token }}',
+        gridSelector: '#media-grid',
+        resizeMaxDim: 2000,
+        jpegQuality: 0.85,
+        allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
+        maxSizeBytes: 10485760
+     })"
+     class="mt-4">
+
+    <label @dragover.prevent @drop.prevent="onFilesDropped($event)"
+           class="flex flex-col items-center justify-center gap-1.5 p-6 rounded-md cursor-pointer
+                  border-2 border-dashed border-outline-variant
+                  text-on-surface-variant hover:border-secondary hover:text-on-surface
+                  transition-colors">
+        {% include "icons/image.html" with size="24" %}
+        <span class="text-sm font-medium">Agregá fotos</span>
+        <span class="text-xs">Arrastrá o hacé clic para elegir</span>
+        <input type="file" accept="image/*" multiple class="hidden"
+               @change="onFilesSelected($event)">
+    </label>
+
+    {# Cola efímera — una fila por archivo en vuelo. Server-invisible. #}
+    <ul x-show="files.length" class="mt-3 flex flex-col gap-1.5">
+        <template x-for="f in files" :key="f.id">
+            <li x-transition:leave="transition ease-in duration-200"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="flex items-center gap-2.5 px-3 py-2 rounded-md bg-surface-container-low text-sm">
+                <span class="shrink-0 flex items-center justify-center w-4 h-4">
+                    <span x-show="f.status !== 'done' && f.status !== 'error'"
+                          class="block w-4 h-4 rounded-full border-2 border-on-surface/20 border-t-on-surface animate-spin"></span>
+                    <span x-show="f.status === 'done'" class="text-success-text">
+                        {% include "icons/check.html" with size="16" %}
+                    </span>
+                    <span x-show="f.status === 'error'" class="text-danger-text">
+                        {% include "icons/x.html" with size="16" %}
+                    </span>
+                </span>
+
+                <span class="min-w-0 flex-1 truncate text-on-surface" x-text="f.name"></span>
+                <span x-show="f.status === 'error'" class="shrink-0 text-xs text-danger-text" x-text="f.error"></span>
+
+                <button type="button" x-show="f.status === 'error'"
+                        @click="uploadFile(f)"
+                        class="shrink-0 text-xs font-medium text-info-text hover:underline">
+                    Reintentar
+                </button>
+            </li>
+        </template>
+    </ul>
+
+</div>
+
+<script>
+function mediaUploader(config) {
+    return {
+        ...config,
+        files: [],
+        nextId: 0,
+
+        onFilesSelected(event) {
+            this.handleFiles(event.target.files);
+            event.target.value = "";  // permite re-elegir el mismo archivo
+        },
+
+        onFilesDropped(event) {
+            this.handleFiles(event.dataTransfer.files);
+        },
+
+        handleFiles(fileList) {
+            Array.from(fileList).forEach((file) => {
+                const row = {
+                    id: this.nextId++,   // id de cliente, NO el uuid de DB
+                    file: file,          // se retiene para el reintento
+                    name: file.name,
+                    status: "pending",
+                    error: "",
+                };
+                this.files.push(row);
+                this.uploadFile(row);
+            });
+        },
+
+        setStatus(row, status, error = "") {
+            row.status = status;
+            row.error = error;
+        },
+
+        removeRow(row) {
+            this.files = this.files.filter((f) => f.id !== row.id);
+        },
+
+        // Resize §7: si el lado mayor supera resizeMaxDim, redimensiona
+        // proporcional y re-encodea JPEG. Si no, devuelve el original tal cual.
+        // imageOrientation:"from-image" hornea el EXIF (el JPEG de canvas no lo
+        // lleva) — fotos verticales de celular no salen acostadas.
+        async resizeIfNeeded(file) {
+            const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+            const longer = Math.max(bitmap.width, bitmap.height);
+            if (longer <= this.resizeMaxDim) {
+                bitmap.close();
+                return { blob: file, contentType: file.type };
+            }
+            const scale = this.resizeMaxDim / longer;
+            const w = Math.round(bitmap.width * scale);
+            const h = Math.round(bitmap.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext("2d").drawImage(bitmap, 0, 0, w, h);
+            bitmap.close();
+            const blob = await new Promise((resolve) =>
+                canvas.toBlob(resolve, "image/jpeg", this.jpegQuality)
+            );
+            return { blob, contentType: "image/jpeg" };
+        },
+
+        async uploadFile(row) {
+            row.error = "";
+
+            if (!row.file.type.startsWith("image/")) {
+                return this.setStatus(row, "error", "No es una imagen.");
+            }
+
+            let blob, contentType;
+            try {
+                this.setStatus(row, "resizing");
+                ({ blob, contentType } = await this.resizeIfNeeded(row.file));
+            } catch (e) {
+                return this.setStatus(row, "error", "No se pudo procesar la imagen.");
+            }
+
+            if (!this.allowedMimes.includes(contentType)) {
+                return this.setStatus(row, "error", "Formato no permitido (JPG, PNG o WebP).");
+            }
+            if (blob.size > this.maxSizeBytes) {
+                return this.setStatus(row, "error", "La foto supera los 10 MB.");
+            }
+
+            this.setStatus(row, "uploading");
+
+            // 1. sign
+            let signed;
+            try {
+                signed = await this.postJson(this.signUrl, {
+                    content_type: contentType,
+                    size: blob.size,
+                });
+            } catch (e) {
+                return this.setStatus(row, "error", "Sin conexión. Reintentá.");
+            }
+            if (!signed.ok) {
+                return this.setStatus(row, "error", await this.errorMessage(signed, "No se pudo iniciar la subida."));
+            }
+            const { key, url } = await signed.json();
+
+            // 2. PUT directo a R2 — el Content-Type debe matchear la firma
+            let put;
+            try {
+                put = await fetch(url, {
+                    method: "PUT",
+                    body: blob,
+                    headers: { "Content-Type": contentType },
+                });
+            } catch (e) {
+                return this.setStatus(row, "error", "Falló la subida. Reintentá.");
+            }
+            if (!put.ok) {
+                return this.setStatus(row, "error", "Falló la subida. Reintentá.");
+            }
+
+            // 3. confirm — registra PropertyMedia, devuelve card + contador OOB
+            let confirmed;
+            try {
+                confirmed = await this.postJson(this.confirmUrl, { key });
+            } catch (e) {
+                return this.setStatus(row, "error", "Sin conexión. Reintentá.");
+            }
+            if (!confirmed.ok) {
+                return this.setStatus(row, "error", await this.errorMessage(confirmed, "No se pudo confirmar la foto."));
+            }
+
+            const html = await confirmed.text();
+            htmx.swap(this.gridSelector, html, { swapStyle: "beforeend" });
+
+            // Graduó: tick breve y la fila se retira
+            this.setStatus(row, "done");
+            setTimeout(() => this.removeRow(row), 1500);
+        },
+
+        async errorMessage(response, fallback) {
+            try {
+                const data = await response.json();
+                return data.error || fallback;
+            } catch (e) {
+                return fallback;
+            }
+        },
+
+        postJson(url, body) {
+            return fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": this.csrfToken,
+                },
+                body: JSON.stringify(body),
+            });
+        },
+    };
+}
+
+function mediaReorder(config) {
+    return {
+        ...config,
+        draggingId: null,
+
+        gridEl() {
+            return this.$el.querySelector(this.gridSelector);
+        },
+
+        currentOrder() {
+            return Array.from(this.gridEl().querySelectorAll("[data-media-id]"))
+                .map((el) => el.dataset.mediaId);
+        },
+
+        // Delegación: los eventos burbujean de los cards al wrapper; el card
+        // se resuelve por closest(data-media-id). Funciona para cards
+        // server-rendered, appendeados por confirm, o swapeados — todos.
+        onDragStart(event) {
+            const card = event.target.closest("[data-media-id]");
+            if (!card) return;
+            this.draggingId = card.dataset.mediaId;
+            event.dataTransfer.effectAllowed = "move";
+        },
+
+        onDragOver(event) {
+            if (this.draggingId === null) return;
+            const over = event.target.closest("[data-media-id]");
+            if (!over || over.dataset.mediaId === this.draggingId) return;
+            const grid = this.gridEl();
+            const dragging = grid.querySelector(`[data-media-id="${this.draggingId}"]`);
+            if (!dragging) return;
+            const order = this.currentOrder();
+            const forward = order.indexOf(this.draggingId) < order.indexOf(over.dataset.mediaId);
+            grid.insertBefore(dragging, forward ? over.nextSibling : over);
+        },
+
+        onDrop() {
+            if (this.draggingId !== null) this.persist();
+        },
+
+        onDragEnd() {
+            this.draggingId = null;
+        },
+
+        onClick(event) {
+            const btn = event.target.closest("[data-move]");
+            if (!btn) return;  // no es un botón subir/bajar → no me meto (hx-post sigue su curso)
+            const card = btn.closest("[data-media-id]");
+            if (card) this.move(card, btn.dataset.move);
+        },
+
+        move(el, dir) {
+            const grid = this.gridEl();
+            if (dir === "up" && el.previousElementSibling) {
+                grid.insertBefore(el, el.previousElementSibling);
+            } else if (dir === "down" && el.nextElementSibling) {
+                grid.insertBefore(el.nextElementSibling, el);
+            } else {
+                return;  // ya está en el extremo
+            }
+            this.persist();
+        },
+
+        async persist() {
+            let resp;
+            try {
+                resp = await fetch(this.reorderUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": this.csrfToken,
+                    },
+                    body: JSON.stringify({ ordered_ids: this.currentOrder() }),
+                });
+            } catch (e) {
+                return;  // sin red: el DOM optimista queda; el próximo render reconcilia
+            }
+            if (resp.status === 200) {
+                const html = await resp.text();
+                htmx.swap("#media-gallery", html, { swapStyle: "outerHTML" });
+            }
+            // 204 → el DOM optimista es la verdad
+        },
+    };
+}
+</script>
