@@ -10,6 +10,15 @@
     </a>
 {% endblock %}
 
+{% block page_actions %}
+    <a href="{% url 'properties:edit' property.pk %}"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded bg-primary-container
+              text-on-primary text-sm font-medium transition-colors hover:bg-primary">
+        {% include "icons/pencil.html" with size="15" %}
+        Editar
+    </a>
+{% endblock %}
+
 {% block content %}
 
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
