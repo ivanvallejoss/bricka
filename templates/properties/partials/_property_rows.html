@@ -28,6 +28,7 @@
                         src="{{ ctx.cover_url }}"
                         alt="{{ property.title|default:property.address_line }}"
                         loading="lazy"
+                        decoding="async"
                         class="block w-full h-full min-h-[68px] object-cover">
                 {% else %}
                     <div class="w-full h-full min-h-[68px] flex items-center justify-center

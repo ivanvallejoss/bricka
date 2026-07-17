@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva propiedad — Fotos{% endblock %}
+
+{% block page_title %}
+    <a href="{% url 'properties:list' %}"
+       class="flex items-center gap-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors">
+        {% include "icons/arrow-left.html" with size="16" %}
+        Propiedades
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    {% include "properties/partials/_wizard_steps.html" %}
+
+    {% include "properties/partials/_media_section.html" %}
+
+    <div class="flex justify-between pt-4">
+        <a href="{% url 'properties:new_detalle' property.pk %}"
+           class="inline-flex items-center gap-2 px-4 py-2 rounded border border-outline
+                  text-sm font-medium text-on-surface hover:bg-surface-container transition-colors">
+            {% include "icons/arrow-left.html" with size="16" %}
+            Atrás
+        </a>
+        <a href="{% url 'properties:detail' property.pk %}"
+           class="px-4 py-2 rounded bg-primary-container text-on-primary text-sm font-medium
+                  hover:bg-primary transition-colors">
+            Finalizar
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% comment %}
+Sección de fotos (§3) — superficie de media completa: wrapper de reorden
+(mediaReorder por delegación) + galería server-owned + cola de subida
+Alpine-owned. Acción inmediata (cada foto persiste al subirse); no hay submit.
+La consumen edición y wizard fase 3. Contexto: property, media_items,
+photo_count, min_photos, max_photos.
+{% endcomment %}
+<section class="bg-surface border border-outline rounded-md p-5">
+    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+        Fotos
+    </p>
+    <div x-data="mediaReorder({
+            reorderUrl: '{% url 'properties:media_reorder' property.pk %}',
+            csrfToken: '{{ csrf_token }}',
+            gridSelector: '#media-grid'
+         })"
+         @dragstart="onDragStart($event)"
+         @dragover.prevent="onDragOver($event)"
+         @drop.prevent="onDrop()"
+         @dragend="onDragEnd()"
+         @click="onClick($event)">
+        {% include "properties/partials/_media_gallery.html" %}
+    </div>
+    {% include "properties/partials/_media_uploader.html" %}
+</section>

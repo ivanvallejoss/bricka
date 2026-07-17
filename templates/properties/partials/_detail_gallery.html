@@ -24,7 +24,7 @@ todas las URLs ya están resueltas en la carga inicial de la página.
             {% for url in gallery_urls %}
             <button type="button" @click="open({{ forloop.counter0 }})"
                     class="aspect-square rounded-md overflow-hidden bg-surface-container hover:opacity-90 transition-opacity">
-                <img src="{{ url }}" loading="lazy" class="w-full h-full object-cover">
+                <img src="{{ url }}" loading="lazy" decoding="async" class="w-full h-full object-cover">
             </button>
             {% endfor %}
         </div>

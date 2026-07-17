@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva propiedad — Detalle{% endblock %}
+
+{% block page_title %}
+    <a href="{% url 'properties:list' %}"
+       class="flex items-center gap-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors">
+        {% include "icons/arrow-left.html" with size="16" %}
+        Propiedades
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    {% include "properties/partials/_wizard_steps.html" %}
+
+    <form method="post" action="{% url 'properties:new_detalle' property.pk %}"
+          x-data="{
+              owner: { id: '{{ owner_initial.id }}', text: '{{ owner_initial.text|escapejs }}', open: false },
+              selectContact(field, id, text) { this[field] = { id, text, open: false }; },
+              clearField(field) { this[field] = { id: '', text: '', open: false }; }
+          }"
+          @contact-selected.window="selectContact($event.detail.field, $event.detail.id, $event.detail.text)"
+          class="bg-surface border border-outline rounded-md p-5 flex flex-col gap-4">
+        {% csrf_token %}
+        {% include "properties/partials/_property_fields.html" %}
+        <div class="flex justify-between pt-2">
+            <button type="submit" name="action" value="exit"
+                    class="px-4 py-2 rounded border border-outline text-sm font-medium text-on-surface
+                           hover:bg-surface-container transition-colors">
+                Guardar y salir
+            </button>
+            <button type="submit" name="action" value="next"
+                    class="px-4 py-2 rounded bg-primary-container text-on-primary text-sm font-medium
+                           hover:bg-primary transition-colors">
+                Siguiente
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% comment %}
+Campos del form escalar (§5) — SIN <form>, sin csrf, sin botones, sin asumir
+acción. Lo consumen edición (_property_form.html) y wizard fase 2
+(property_new_detalle.html), cada uno con su propio <form> (que aporta el
+x-data del combobox de owner + la acción + los botones). Contexto: form,
+min_description, feature_groups, selected_slugs.
+{% endcomment %}
+{% if form.non_field_errors %}
+<div class="flex flex-col gap-1">
+    {% for error in form.non_field_errors %}
+    <p class="text-sm text-danger-text">{{ error }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# Título + consejo (§5) #}
+<div class="flex flex-col gap-1.5">
+    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Título</label>
+    <input type="text" name="title" maxlength="150" value="{{ form.title.value|default:'' }}"
+           class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                  focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                  {% if form.title.errors %}border-danger-text{% else %}border-outline{% endif %}">
+    <p class="text-xs text-on-surface-variant">
+        Buscá que sea googleable por sus características: «Depto 3 amb con balcón en Villa del Parque», no «Propiedad Rivadavia».
+    </p>
+    {% if form.title.errors %}<p class="text-xs text-danger-text">{{ form.title.errors.0 }}</p>{% endif %}
+</div>
+
+{# Descripción + contador /150 #}
+<div class="flex flex-col gap-1.5" x-data="{ len: {{ form.description.value|default:''|length }} }">
+    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Descripción</label>
+    <textarea name="description" rows="5" @input="len = $event.target.value.length"
+              class="w-full px-3 py-2 text-sm bg-surface border rounded resize-y transition-colors
+                     focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                     {% if form.description.errors %}border-danger-text{% else %}border-outline{% endif %}">{{ form.description.value|default:'' }}</textarea>
+    <p class="text-xs" :class="len >= {{ min_description }} ? 'text-success-text' : 'text-on-surface-variant'">
+        <span x-text="len"></span>/{{ min_description }} para publicar
+    </p>
+    {% if form.description.errors %}<p class="text-xs text-danger-text">{{ form.description.errors.0 }}</p>{% endif %}
+</div>
+
+{# Dirección #}
+<div class="flex flex-col gap-1.5">
+    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Dirección *</label>
+    <input type="text" name="address_line" value="{{ form.address_line.value|default:'' }}"
+           class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                  focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                  {% if form.address_line.errors %}border-danger-text{% else %}border-outline{% endif %}">
+    {% if form.address_line.errors %}<p class="text-xs text-danger-text">{{ form.address_line.errors.0 }}</p>{% endif %}
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Ciudad *</label>
+        <input type="text" name="city" value="{{ form.city.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.city.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.city.errors %}<p class="text-xs text-danger-text">{{ form.city.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Provincia *</label>
+        <input type="text" name="province" value="{{ form.province.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.province.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.province.errors %}<p class="text-xs text-danger-text">{{ form.province.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Barrio</label>
+        <input type="text" name="neighborhood" value="{{ form.neighborhood.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.neighborhood.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.neighborhood.errors %}<p class="text-xs text-danger-text">{{ form.neighborhood.errors.0 }}</p>{% endif %}
+    </div>
+</div>
+
+{# Detalle numérico #}
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">m²</label>
+        <input type="number" name="area_m2" step="0.01" min="0" value="{{ form.area_m2.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.area_m2.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.area_m2.errors %}<p class="text-xs text-danger-text">{{ form.area_m2.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Dorm.</label>
+        <input type="number" name="bedrooms" min="0" value="{{ form.bedrooms.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.bedrooms.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.bedrooms.errors %}<p class="text-xs text-danger-text">{{ form.bedrooms.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Baños</label>
+        <input type="number" name="bathrooms" min="0" value="{{ form.bathrooms.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.bathrooms.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.bathrooms.errors %}<p class="text-xs text-danger-text">{{ form.bathrooms.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Cocheras</label>
+        <input type="number" name="parking_spaces" min="0" value="{{ form.parking_spaces.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.parking_spaces.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.parking_spaces.errors %}<p class="text-xs text-danger-text">{{ form.parking_spaces.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Año</label>
+        <input type="number" name="year_built" min="0" value="{{ form.year_built.value|default:'' }}"
+               class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                      {% if form.year_built.errors %}border-danger-text{% else %}border-outline{% endif %}">
+        {% if form.year_built.errors %}<p class="text-xs text-danger-text">{{ form.year_built.errors.0 }}</p>{% endif %}
+    </div>
+</div>
+
+{# Video #}
+<div class="flex flex-col gap-1.5">
+    <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Video (YouTube)</label>
+    <input type="url" name="youtube_video_url" value="{{ form.youtube_video_url.value|default:'' }}"
+           class="w-full px-3 py-2 text-sm bg-surface border rounded transition-colors
+                  focus:outline-none focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container
+                  {% if form.youtube_video_url.errors %}border-danger-text{% else %}border-outline{% endif %}">
+    {% if form.youtube_video_url.errors %}<p class="text-xs text-danger-text">{{ form.youtube_video_url.errors.0 }}</p>{% endif %}
+</div>
+
+{# Features (§5) #}
+<div class="flex flex-col gap-2 pt-2 border-t border-outline-variant">
+    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">Características</p>
+    {% include "properties/partials/_feature_selector.html" %}
+</div>
+
+{# Propietario #}
+<div class="pt-2 border-t border-outline-variant">
+    {% include "contracts/partials/_combobox_contact.html" with field="owner" label="Propietario" form_field=form.owner_contact_id %}
+</div>

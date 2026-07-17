@@ -7,12 +7,12 @@
 {% endblock %}
 
 {% block page_actions %}
-    <button type="button" disabled title="Disponible próximamente"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded bg-primary-container text-on-primary
-                   text-sm font-medium opacity-40 cursor-not-allowed">
+    <a href="{% url 'properties:new' %}"
+       class="inline-flex items-center gap-2 px-4 py-2 rounded bg-primary-container text-on-primary
+              text-sm font-medium transition-colors hover:bg-primary">
         {% include "icons/plus.html" with size="15" %}
         Nueva propiedad
-    </button>
+    </a>
 {% endblock %}
 
 {% block content %}

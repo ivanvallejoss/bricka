@@ -1,0 +1,24 @@
+{% comment %}
+Form escalar de EDICIÓN (§2/§5) — envoltorio. Aporta el <form> (acción edit),
+el x-data del combobox de owner, el csrf y el botón. Los campos vienen de
+_property_fields.html (compartido con el wizard fase 2). Contexto: form,
+property, min_description, feature_groups, selected_slugs, owner_initial.
+{% endcomment %}
+<form method="post" action="{% url 'properties:edit' property.pk %}"
+      x-data="{
+          owner: { id: '{{ owner_initial.id }}', text: '{{ owner_initial.text|escapejs }}', open: false },
+          selectContact(field, id, text) { this[field] = { id, text, open: false }; },
+          clearField(field) { this[field] = { id: '', text: '', open: false }; }
+      }"
+      @contact-selected.window="selectContact($event.detail.field, $event.detail.id, $event.detail.text)"
+      class="bg-surface border border-outline rounded-md p-5 flex flex-col gap-4">
+    {% csrf_token %}
+    {% include "properties/partials/_property_fields.html" %}
+    <div class="flex justify-end">
+        <button type="submit"
+                class="px-4 py-2 rounded bg-primary-container text-on-primary text-sm font-medium
+                       transition-colors hover:bg-primary">
+            Guardar
+        </button>
+    </div>
+</form>

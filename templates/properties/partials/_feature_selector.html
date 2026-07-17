@@ -1,0 +1,27 @@
+{% comment %}
+Selector de features (§5) — checkboxes agrupados por categoría, siempre
+visibles (sin colapso), grid 3/2, contador por categoría live (Alpine).
+Va DENTRO del <form> escalar; postea name="features" (slugs). Reemplazo
+total: los marcados son la lista completa. Contexto: feature_groups (lista
+de {label, features}), selected_slugs (set).
+{% endcomment %}
+<div class="flex flex-col gap-4">
+    {% for group in feature_groups %}
+    <div x-data="{ n: 0 }" x-init="n = $el.querySelectorAll('input:checked').length">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-2">
+            {{ group.label }} · <span x-text="n"></span> seleccionadas
+        </p>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {% for feature in group.features %}
+            <label class="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
+                <input type="checkbox" name="features" value="{{ feature.slug }}"
+                       @change="n += $event.target.checked ? 1 : -1"
+                       {% if feature.slug in selected_slugs %}checked{% endif %}
+                       class="w-4 h-4 rounded border-outline accent-primary shrink-0">
+                {{ feature.label }}
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>

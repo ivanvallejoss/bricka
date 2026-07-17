@@ -1,0 +1,22 @@
+{% comment %}
+Indicador de pasos del wizard (§1). Contexto: wizard_steps (lista de (n, label)),
+current_step (1|2|3). Los pasos pasados se muestran completados pero NO son
+clickeables — los campos de fase 1 son inmutables post-creación; un paso que
+parece navegable y no lo es genera el click frustrado.
+{% endcomment %}
+<ol class="flex items-center gap-2 mb-6 text-sm">
+    {% for n, label in wizard_steps %}
+    <li class="flex items-center gap-2">
+        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium
+            {% if n == current_step %}bg-primary-container text-on-primary
+            {% elif n < current_step %}bg-success-bg text-success-text
+            {% else %}bg-surface-container text-on-surface-variant{% endif %}">
+            {% if n < current_step %}{% include "icons/check.html" with size="14" %}{% else %}{{ n }}{% endif %}
+        </span>
+        <span class="{% if n == current_step %}font-medium text-on-surface{% else %}text-on-surface-variant{% endif %}">
+            {{ label }}
+        </span>
+        {% if not forloop.last %}<span class="w-8 h-px bg-outline-variant"></span>{% endif %}
+    </li>
+    {% endfor %}
+</ol>
