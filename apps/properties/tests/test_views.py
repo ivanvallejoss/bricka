@@ -385,3 +385,51 @@ class TestPropertyNew:
         )
         assert resp.status_code == 302
         assert Property.objects.get().is_external is True
+
+
+class TestPropertyNewDetalle:
+    def _detalle_data(self, **overrides):
+        base = {
+            "title": "Nuevo título", "description": "Una descripción.",
+            "address_line": "Calle 1", "city": "Resistencia", "province": "Chaco",
+            "neighborhood": "", "area_m2": "", "bedrooms": "", "bathrooms": "",
+            "parking_spaces": "", "year_built": "", "youtube_video_url": "",
+            "owner_contact_id": "",
+        }
+        base.update(overrides)
+        return base
+
+    def test_get_renders_prefilled(self, auth_client, db):
+        prop = PropertyFactory(title="Existente")
+        resp = auth_client.get(reverse("properties:new_detalle", kwargs={"pk": prop.pk}))
+        assert resp.status_code == 200
+        assert b'name="title"' in resp.content
+        assert b"Existente" in resp.content
+
+    def test_post_saves_and_redirects(self, auth_client, db):
+        prop = PropertyFactory(title="Viejo")
+        resp = auth_client.post(
+            reverse("properties:new_detalle", kwargs={"pk": prop.pk}),
+            data=self._detalle_data(),
+        )
+        assert resp.status_code == 302
+        prop.refresh_from_db()
+        assert prop.title == "Nuevo título"
+    
+    def test_post_next_redirects_to_fotos(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(
+            reverse("properties:new_detalle", kwargs={"pk": prop.pk}),
+            data=self._detalle_data(action="next"),
+        )
+        assert resp.status_code == 302
+        assert resp.url == reverse("properties:new_fotos", kwargs={"pk": prop.pk})
+
+
+class TestPropertyNewFotos:
+    def test_renders_fotos_page(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        resp = auth_client.get(reverse("properties:new_fotos", kwargs={"pk": prop.pk}))
+        assert resp.status_code == 200
+        assert b'id="media-gallery"' in resp.content
+        assert b"mediaUploader(" in resp.content
