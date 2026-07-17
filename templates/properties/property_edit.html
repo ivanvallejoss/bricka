@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Editar — {{ property.title|default:property.address_line }}{% endblock %}
+
+{% block page_title %}
+    <a href="{% url 'properties:detail' property.pk %}"
+       class="flex items-center gap-2 text-sm font-medium text-on-surface-variant hover:text-on-surface transition-colors">
+        {% include "icons/arrow-left.html" with size="16" %}
+        Volver a la propiedad
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl space-y-6">
+
+    {# ── Datos de la propiedad (form escalar §2) — hueco nombrado, punto 6 ── #}
+    {# El form escalar de edición se monta acá en el punto 6 (reemplazo total,   #}
+    {# features como lista de slugs). Huecos operación/externas/location → S3b.  #}
+
+    {# ── Fotos ─────────────────────────────────────────────────────────────── #}
+    <section class="bg-surface border border-outline rounded-md p-5">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+            Fotos
+        </p>
+        <div x-data="mediaReorder({
+                reorderUrl: '{% url 'properties:media_reorder' property.pk %}',
+                csrfToken: '{{ csrf_token }}',
+                gridSelector: '#media-grid'
+             })"
+             @dragstart="onDragStart($event)"
+             @dragover.prevent="onDragOver($event)"
+             @drop.prevent="onDrop()"
+             @dragend="onDragEnd()"
+             @click="onClick($event)">
+            {% include "properties/partials/_media_gallery.html" %}
+        </div>
+        {% include "properties/partials/_media_uploader.html" %}
+    </section>
+
+</div>
+{% endblock %}
