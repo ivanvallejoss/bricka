@@ -8,9 +8,12 @@ from django.urls import reverse
 from botocore.exceptions import ClientError
 
 from apps.common import storage
+
+from apps.contacts.tests.factories import ContactFactory
+
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
 from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory
-from apps.properties.models import PropertyMedia
+from apps.properties.models import PropertyMedia, Feature, Property
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
 
 
@@ -257,3 +260,128 @@ class TestPropertyEdit:
     def test_404_on_missing_property(self, auth_client, db):
         resp = auth_client.get(reverse("properties:edit", kwargs={"pk": uuid4()}))
         assert resp.status_code == 404
+
+    def _valid_edit_data(self, **overrides):
+        data = {
+            "title": "Nuevo título", "description": "Una descripción.",
+            "address_line": "Calle 1", "city": "Resistencia", "province": "Chaco",
+            "neighborhood": "Centro", "area_m2": "80", "bedrooms": "3",
+            "bathrooms": "2", "parking_spaces": "1", "year_built": "2010",
+            "youtube_video_url": "",
+            "owner_contact_id": "",
+        }
+        data.update(overrides)
+        return data
+
+    def test_edit_post_saves_scalar_fields(self, auth_client, stub_r2, db):
+        prop = PropertyFactory(title="Viejo", city="Corrientes")
+        resp = auth_client.post(
+            reverse("properties:edit", kwargs={"pk": prop.pk}),
+            data=self._valid_edit_data(),
+        )
+        assert resp.status_code == 302
+        prop.refresh_from_db()
+        assert prop.title == "Nuevo título"
+        assert prop.city == "Resistencia"
+        assert prop.bedrooms == 3
+
+    def test_edit_post_invalid_rerenders_with_errors(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(
+            reverse("properties:edit", kwargs={"pk": prop.pk}),
+            data=self._valid_edit_data(address_line="", city="", province=""),
+        )
+        assert resp.status_code == 200
+        assert b"border-danger-text" in resp.content
+
+    def test_edit_post_replaces_features(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        feats = list(Feature.objects.filter(is_active=True)[:2])
+        assert len(feats) >= 2
+        old, new = feats[0], feats[1]
+        prop.features.add(old)
+        resp = auth_client.post(
+            reverse("properties:edit", kwargs={"pk": prop.pk}),
+            data=self._valid_edit_data(features=[new.slug]),
+        )
+        assert resp.status_code == 302
+        prop.refresh_from_db()
+        assert set(prop.features.values_list("slug", flat=True)) == {new.slug}
+
+    def test_edit_post_empty_features_clears(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        feat = Feature.objects.filter(is_active=True).first()
+        prop.features.add(feat)
+        resp = auth_client.post(
+            reverse("properties:edit", kwargs={"pk": prop.pk}),
+            data=self._valid_edit_data(),  # sin features → vacía
+        )
+        assert resp.status_code == 302
+        prop.refresh_from_db()
+        assert prop.features.count() == 0
+
+    def test_edit_post_invalid_preserves_checked_features(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        feat = Feature.objects.filter(is_active=True).first()
+        resp = auth_client.post(
+            reverse("properties:edit", kwargs={"pk": prop.pk}),
+            data=self._valid_edit_data(address_line="", features=[feat.slug]),
+        )
+        assert resp.status_code == 200
+        assert feat.slug in resp.context["selected_slugs"]
+
+    def test_edit_post_sets_owner(self, auth_client, stub_r2, db):
+        prop = PropertyFactory()
+        contact = ContactFactory()
+        resp = auth_client.post(
+            reverse("properties:edit", kwargs={"pk": prop.pk}),
+            data=self._valid_edit_data(owner_contact_id=str(contact.pk)),
+        )
+        assert resp.status_code == 302
+        prop.refresh_from_db()
+        assert prop.owner_contact == contact
+
+
+class TestPropertyNew:
+    def _create_data(self, **overrides):
+        base = {
+            "property_type": "apartment", "address_line": "Calle 1",
+            "city": "Resistencia", "province": "Chaco", "neighborhood": "",
+            "is_external": "", "agency_name": "",
+        }
+        base.update(overrides)
+        return base
+
+    def test_get_renders_form(self, auth_client, db):
+        resp = auth_client.get(reverse("properties:new"))
+        assert resp.status_code == 200
+        assert b'name="property_type"' in resp.content
+
+    def test_post_creates_and_redirects(self, auth_client, db):
+        resp = auth_client.post(reverse("properties:new"), data=self._create_data())
+        assert resp.status_code == 302
+        prop = Property.objects.get()
+        assert prop.property_type == "apartment"
+        assert prop.city == "Resistencia"
+
+    def test_post_sets_actor(self, auth_client, actor, db):
+        auth_client.post(reverse("properties:new"), data=self._create_data())
+        prop = Property.objects.get()
+        assert prop.created_by == actor  # el audit trail nace acá
+
+    def test_external_without_agency_shows_nonfield_error(self, auth_client, db):
+        resp = auth_client.post(
+            reverse("properties:new"),
+            data=self._create_data(is_external="on", agency_name=""),
+        )
+        assert resp.status_code == 200
+        assert Property.objects.count() == 0
+        assert resp.context["form"].non_field_errors
+
+    def test_external_with_agency_creates(self, auth_client, db):
+        resp = auth_client.post(
+            reverse("properties:new"),
+            data=self._create_data(is_external="on", agency_name="Inmobiliaria X"),
+        )
+        assert resp.status_code == 302
+        assert Property.objects.get().is_external is True
