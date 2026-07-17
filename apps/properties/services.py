@@ -200,6 +200,56 @@ def update_property(
     return property
 
 
+def update_external_source(
+    *,
+    property: Property,
+    agency_name: str = UNSET,
+    source_url: str = UNSET,
+    agreed_commission_percent: Decimal | None = UNSET,
+    actor: User,
+) -> ExternalPropertySource:
+    """
+    Corrige la fuente externa de una propiedad (§6). Contrato UNSET idéntico
+    a update_property:
+      - UNSET (default) → el campo no se toca.
+      - "" / None → blanquear (semántica de reemplazo desde el form).
+      - valor → set.
+    Precondición: property.is_external. NUNCA crea la fila 1:1 por el costado
+    — la invariante nace en create_property; acá se respeta por omisión y se
+    rechaza si no aplica. agency_name no admite blanquear (espejo de
+    create_property): "" / None se rechazan. source_url y comisión se blanquean
+    libremente.
+    """
+    if not property.is_external:
+        raise PropertyValidationError(
+            "La propiedad no es externa: no tiene fuente que editar."
+        )
+
+    if agency_name is not UNSET and not agency_name:
+        raise PropertyValidationError(
+            "El nombre de la agencia no puede quedar vacío."
+        )
+
+    source = property.external_source
+
+    field_values = {
+        "agency_name": agency_name,
+        "source_url": source_url,
+        "agreed_commission_percent": agreed_commission_percent,
+    }
+
+    update_fields = ["updated_by", "updated_at"]
+    for field, value in field_values.items():
+        if value is not UNSET:
+            setattr(source, field, value)
+            update_fields.append(field)
+
+    source.updated_by = actor
+    source.save(update_fields=update_fields)
+
+    return source
+
+
 def update_property_status(*, property: Property, status: str, actor: User) -> Property:
     """
     Actualiza el status de una propiedad.

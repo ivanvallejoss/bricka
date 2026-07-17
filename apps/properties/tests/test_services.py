@@ -17,8 +17,14 @@ from apps.properties.services import (
     set_cover_media,
     update_property,
     upload_property_media,
+    update_external_source,
 )
-from .factories import PropertyFactory, PropertyMediaFactory, FeatureFactory
+from .factories import (
+    PropertyFactory, 
+    PropertyMediaFactory, 
+    FeatureFactory,
+    ExternalPropertySourceFactory
+)
 
 
 class TestCreateProperty:
@@ -167,6 +173,96 @@ class TestUpdateProperty:
         update_property(property=prop, owner_contact_id=None, actor=actor)
         prop.refresh_from_db()
         assert prop.owner_contact_id is None
+
+
+class TestUpdateExternalSource:
+    def test_updates_provided_fields(self, db, actor):
+        source = ExternalPropertySourceFactory(
+            source_url="https://viejo.example.com",
+            agreed_commission_percent=Decimal("3.00"),
+        )
+        update_external_source(
+            property=source.property,
+            source_url="https://nuevo.example.com",
+            agreed_commission_percent=Decimal("4.50"),
+            actor=actor,
+        )
+        source.refresh_from_db()
+        assert source.source_url == "https://nuevo.example.com"
+        assert source.agreed_commission_percent == Decimal("4.50")
+
+    def test_omitted_fields_are_not_touched(self, db, actor):
+        source = ExternalPropertySourceFactory(
+            agency_name="Inmobiliaria Norte",
+            source_url="https://norte.example.com",
+        )
+        update_external_source(
+            property=source.property,
+            agreed_commission_percent=Decimal("5.00"),
+            actor=actor,
+        )
+        source.refresh_from_db()
+        assert source.agency_name == "Inmobiliaria Norte"
+        assert source.source_url == "https://norte.example.com"
+        assert source.agreed_commission_percent == Decimal("5.00")
+
+    def test_empty_string_blanks_source_url(self, db, actor):
+        source = ExternalPropertySourceFactory(source_url="https://norte.example.com")
+        update_external_source(property=source.property, source_url="", actor=actor)
+        source.refresh_from_db()
+        assert source.source_url == ""
+
+    def test_none_blanks_commission(self, db, actor):
+        source = ExternalPropertySourceFactory(
+            agreed_commission_percent=Decimal("3.00")
+        )
+        update_external_source(
+            property=source.property,
+            agreed_commission_percent=None,
+            actor=actor,
+        )
+        source.refresh_from_db()
+        assert source.agreed_commission_percent is None
+
+    def test_updates_agency_name(self, db, actor):
+        source = ExternalPropertySourceFactory(agency_name="Vieja")
+        update_external_source(
+            property=source.property, agency_name="Nueva", actor=actor
+        )
+        source.refresh_from_db()
+        assert source.agency_name == "Nueva"
+
+    def test_empty_agency_name_is_rejected(self, db, actor):
+        source = ExternalPropertySourceFactory(agency_name="Inmobiliaria Norte")
+        with pytest.raises(PropertyValidationError):
+            update_external_source(
+                property=source.property, agency_name="", actor=actor
+            )
+        source.refresh_from_db()
+        assert source.agency_name == "Inmobiliaria Norte"
+
+    def test_raises_when_property_not_external(self, db, actor):
+        prop = PropertyFactory()  # is_external=False por default
+        with pytest.raises(PropertyValidationError):
+            update_external_source(
+                property=prop, agency_name="Cualquiera", actor=actor
+            )
+
+    def test_non_external_does_not_create_source(self, db, actor):
+        prop = PropertyFactory()
+        with pytest.raises(PropertyValidationError):
+            update_external_source(
+                property=prop, source_url="https://x.example.com", actor=actor
+            )
+        assert not ExternalPropertySource.objects.filter(property=prop).exists()
+
+    def test_updates_actor_as_updated_by(self, db, actor):
+        source = ExternalPropertySourceFactory()
+        update_external_source(
+            property=source.property, source_url="https://x.example.com", actor=actor
+        )
+        source.refresh_from_db()
+        assert source.updated_by == actor
 
 
 class TestArchiveProperty:
