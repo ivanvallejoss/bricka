@@ -3,13 +3,14 @@ from uuid import UUID
 
 from datetime import date
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import Http404, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.core.paginator import Paginator
+from django.contrib import messages
 
 from urllib.parse import urlencode
 
-from .models import Property, PropertyMedia
+from .models import Property, PropertyMedia, Feature
 from .services import (
     ALLOWED_MEDIA_MIME_TYPES,
     MAX_MEDIA_SIZE_BYTES,
@@ -20,6 +21,8 @@ from .services import (
     set_cover_media,
     delete_property_media,
     reorder_property_media,
+    update_property,
+    create_property,
 )
 from .selectors import (
     PropertyFilters, 
@@ -30,6 +33,8 @@ from .selectors import (
     )
 from .contexts import BadgeContext, PropertyListContext, MediaItemContext
 from .exceptions import PropertyValidationError
+from .forms import PropertyForm, PropertyCreateForm
+from .choices import FeatureCategory, PropertyType
 
 from apps.billing.selectors import (
     get_rental_payment_status, 
@@ -47,6 +52,8 @@ from apps.common.storage import (
     delete_public_media,
 )
 
+from apps.contacts.models import Contact
+
 from apps.contracts.selectors import get_active_contract_for_property
 
 from apps.documents.selectors import get_document_list, DocumentFilters
@@ -54,7 +61,7 @@ from apps.documents.context import DocumentContext
 from apps.documents.utils import categorize_document
 
 from apps.listings.selectors import get_listings_for_property
-from apps.listings.services import MIN_PHOTOS_TO_PUBLISH
+from apps.listings.services import MIN_PHOTOS_TO_PUBLISH, MIN_DESCRIPTION_LENGTH
 
 
 _BADGE_MAP = {
@@ -62,6 +69,49 @@ _BADGE_MAP = {
     PaymentStatus.PENDING: BadgeContext(text="Pendiente", style="warning"),
     PaymentStatus.OVERDUE: BadgeContext(text="En mora",   style="danger"),
 }
+
+
+WIZARD_STEPS = [(1, "Identificación"), (2, "Detalle"), (3, "Fotos")]
+
+
+def property_new(request):
+    """
+    Fase 1 del wizard (§1): identificación. POST crea el borrador vía
+    create_property y salta a la fase siguiente. is_external es acá o nunca
+    (prohibido en update_property). La regla is_external → agency la valida
+    create_property (PropertyValidationError) y se muestra como non-field
+    error, sin adivinar el campo desde el mensaje genérico.
+    """
+    if request.method == "POST":
+        form = PropertyCreateForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            try:
+                property = create_property(
+                    property_type=cd["property_type"],
+                    address_line=cd["address_line"],
+                    city=cd["city"],
+                    province=cd["province"],
+                    neighborhood=cd["neighborhood"],
+                    is_external=cd["is_external"],
+                    agency_name=cd["agency_name"],
+                    actor=request.user,
+                )
+            except PropertyValidationError as e:
+                form.add_error(None, str(e))
+            else:
+                # W1: aterriza en el detail (la propiedad ya es operable).
+                # W2 reescribe este redirect a properties:new_detalle.
+                return redirect("properties:detail", pk=property.pk)
+    else:
+        form = PropertyCreateForm()
+
+    return render(request, "properties/property_new.html", {
+        "form": form,
+        "property_types": PropertyType.choices,
+        "wizard_steps": WIZARD_STEPS,
+        "current_step": 1,
+    })
 
 
 def property_list(request):
@@ -523,17 +573,81 @@ def media_reorder(request, pk):
     return HttpResponse(status=204)
 
 
+def _feature_groups():
+    return [
+        {"label": label, "features": Feature.objects.filter(category=value, is_active=True)}
+        for value, label in FeatureCategory.choices
+    ]
+
+
+def _owner_initial(property, submitted_owner_id):
+    # Estado inicial del combobox de owner. GET: owner actual. Error: el owner
+    # submitted (ya validado como UUID) para no perder la selección al re-render.
+    if submitted_owner_id:
+        contact = Contact.objects.filter(pk=submitted_owner_id).first()
+    else:
+        contact = property.owner_contact
+    if contact is None:
+        return {"id": "", "text": ""}
+    return {"id": str(contact.pk), "text": contact.full_name}
+
+
 def property_edit(request, pk):
     """
-    Página de edición de una propiedad (§2, parcial). S3a monta la sección
-    de fotos; el form escalar de edición es un hueco nombrado hasta el punto 6.
+    Página de edición (§2). GET renderiza el form escalar + la sección de
+    fotos. POST guarda el form escalar vía update_property y vuelve al detail.
+
+    F2a: solo campos escalares. features y owner_contact NO se mandan (kwargs
+    omitidos → UNSET → no se tocan) hasta F2b/F2c. location y externas TAMPOCO
+    se nombran nunca: son de S3b y un guardado escalar no debe borrarlos.
     """
     try:
         property = Property.objects.get(pk=pk)
     except Property.DoesNotExist:
         raise Http404
+
+    if request.method == "POST":
+        form = PropertyForm(request.POST, instance=property)
+        if form.is_valid():
+            cd = form.cleaned_data
+            # KWARGS EXPLÍCITOS, nunca **cd: location y externas quedan UNSET a
+            # propósito — ver PropertyForm. features y owner_contact_id SÍ viajan
+            # (reemplazo total §2/§5; [] / None vacían). Nunca UNSET desde acá.
+            update_property(
+                property=property,
+                title=cd["title"],
+                description=cd["description"],
+                address_line=cd["address_line"],
+                city=cd["city"],
+                province=cd["province"],
+                neighborhood=cd["neighborhood"],
+                area_m2=cd["area_m2"],
+                bedrooms=cd["bedrooms"],
+                bathrooms=cd["bathrooms"],
+                parking_spaces=cd["parking_spaces"],
+                year_built=cd["year_built"],
+                youtube_video_url=cd["youtube_video_url"],
+                features=request.POST.getlist("features"),
+                owner_contact_id=cd["owner_contact_id"],
+                actor=request.user,
+            )
+            messages.success(request, "Cambios guardados.")
+            return redirect("properties:detail", pk=property.pk)
+        # Error: preservar lo que el socio marcó, no lo persistido (§5).
+        selected_slugs = set(request.POST.getlist("features"))
+        owner_initial = _owner_initial(property, form.cleaned_data.get("owner_contact_id"))
+    else:
+        form = PropertyForm(instance=property)
+        selected_slugs = set(property.features.values_list("slug", flat=True))
+        owner_initial = _owner_initial(property, None)
+
     return render(request, "properties/property_edit.html", {
         "property": property,
+        "form": form,
+        "feature_groups": _feature_groups(),
+        "selected_slugs": selected_slugs,
+        "owner_initial": owner_initial,
         "media_items": [_media_item_context(m) for m in property.media.all()],
         **_gate_context(property),
+        "min_description": MIN_DESCRIPTION_LENGTH,
     })

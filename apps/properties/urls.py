@@ -6,6 +6,7 @@ app_name = "properties"
 urlpatterns = [
     path("", views.property_list, name="list"),
     path("search/", views.property_search, name="search"),
+    path("new/", views.property_new, name="new"),
     path("<uuid:pk>/slide-over/", views.property_slide_over, name="slide_over"),
     path("<uuid:pk>/slide-over/publications/", views.slide_over_publications, name="slide_over_publications"),
     path("<uuid:pk>/slide-over/billing/", views.slide_over_billing, name="slide_over_billing"),
