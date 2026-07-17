@@ -12,10 +12,12 @@ urlpatterns = [
     path("<uuid:pk>/slide-over/contacts/", views.slide_over_contacts, name="slide_over_contacts"),
     path("<uuid:pk>/slide-over/documents/", views.slide_over_documents, name="slide_over_documents"),
     path("<uuid:pk>/", views.property_detail, name="detail"), 
+    path("<uuid:pk>/edit/", views.property_edit, name="edit"),
     path("<uuid:pk>/publications/", views.detail_publication, name="detail_publication"),
     path("<uuid:pk>/documents/", views.detail_documents, name="detail_documents"),
     path("<uuid:pk>/media/sign/", views.media_sign, name="media_sign"),
     path("<uuid:pk>/media/confirm/", views.media_confirm, name="media_confirm"),
+    path("<uuid:pk>/media/reorder/", views.media_reorder, name="media_reorder"),
     path("media/<uuid:id>/set-cover/", views.media_set_cover, name="media_set_cover"),
     path("media/<uuid:id>/delete/", views.media_delete, name="media_delete"),
 ]

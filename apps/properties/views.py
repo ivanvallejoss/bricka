@@ -1,9 +1,10 @@
 import json
+from uuid import UUID
 
 from datetime import date
 
 from django.shortcuts import render
-from django.http import Http404, HttpResponseNotAllowed, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.core.paginator import Paginator
 
 from urllib.parse import urlencode
@@ -18,6 +19,7 @@ from .services import (
     upload_property_media,
     set_cover_media,
     delete_property_media,
+    reorder_property_media,
 )
 from .selectors import (
     PropertyFilters, 
@@ -27,6 +29,7 @@ from .selectors import (
     get_properties_for_search,
     )
 from .contexts import BadgeContext, PropertyListContext, MediaItemContext
+from .exceptions import PropertyValidationError
 
 from apps.billing.selectors import (
     get_rental_payment_status, 
@@ -476,3 +479,61 @@ def media_delete(request, id):
     delete_public_media(media.r2_key)
     delete_property_media(media=media)
     return _media_gallery_response(request, property)
+
+
+def media_reorder(request, pk):
+    """
+    Reordena las fotos de una propiedad (§9). reorder_property_media (§10.3)
+    exige que el set de ids coincida exacto.
+
+    Éxito → 204 (HTMX no swapea: el cliente ya impuso el orden, no hay verdad
+    nueva que renderizar). Set desincronizado (borrado concurrente / DOM
+    viejo) → 200 + galería re-renderizada: re-sync a la verdad de DB. No hay
+    modal abierto en un drag, así que el re-render ES la recuperación —
+    no va por modal_error. Body malformado → 400 JSON.
+
+    Contrato del body: {"ordered_ids": [<uuid>, ...]}.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+
+    try:
+        payload = json.loads(request.body)
+        raw_ids = payload["ordered_ids"]
+        if not isinstance(raw_ids, list):
+            raise ValueError
+        ordered_ids = [UUID(str(x)) for x in raw_ids]
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return JsonResponse({"error": "Orden inválido."}, status=400)
+
+    try:
+        reorder_property_media(
+            property=property,
+            ordered_media_ids=ordered_ids,
+            actor=request.user,
+        )
+    except PropertyValidationError:
+        return _media_gallery_response(request, property)
+
+    return HttpResponse(status=204)
+
+
+def property_edit(request, pk):
+    """
+    Página de edición de una propiedad (§2, parcial). S3a monta la sección
+    de fotos; el form escalar de edición es un hueco nombrado hasta el punto 6.
+    """
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+    return render(request, "properties/property_edit.html", {
+        "property": property,
+        "media_items": [_media_item_context(m) for m in property.media.all()],
+        **_gate_context(property),
+    })
