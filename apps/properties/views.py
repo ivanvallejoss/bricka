@@ -100,9 +100,7 @@ def property_new(request):
             except PropertyValidationError as e:
                 form.add_error(None, str(e))
             else:
-                # W1: aterriza en el detail (la propiedad ya es operable).
-                # W2 reescribe este redirect a properties:new_detalle.
-                return redirect("properties:detail", pk=property.pk)
+                return redirect("properties:new_detalle", pk=property.pk)
     else:
         form = PropertyCreateForm()
 
@@ -111,6 +109,60 @@ def property_new(request):
         "property_types": PropertyType.choices,
         "wizard_steps": WIZARD_STEPS,
         "current_step": 1,
+    })
+
+
+def property_new_detalle(request, pk):
+    """
+    Fase 2 del wizard (§1): detalle. Reusa el form escalar (§5) — sin bloques
+    externas/location (S3b). Ambos submits guardan (la fase persiste, §1):
+    "Guardar y salir" → detail; "Siguiente" → fotos (W3 lo reapunta; hoy a
+    detail temporal).
+    """
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+
+    if request.method == "POST":
+        form = PropertyForm(request.POST, instance=property)
+        if form.is_valid():
+            _save_property_scalar(property, form, request)
+            if request.POST.get("action") == "next":
+                return redirect("properties:new_fotos", pk=property.pk)
+            return redirect("properties:detail", pk=property.pk)
+    else:
+        form = PropertyForm(instance=property)
+
+    selected_slugs, owner_initial = _selected_and_owner(request, property, form)
+    return render(request, "properties/property_new_detalle.html", {
+        "property": property,
+        "form": form,
+        "feature_groups": _feature_groups(),
+        "selected_slugs": selected_slugs,
+        "owner_initial": owner_initial,
+        "min_description": MIN_DESCRIPTION_LENGTH,
+        "wizard_steps": WIZARD_STEPS,
+        "current_step": 2,
+    })
+
+
+def property_new_fotos(request, pk):
+    """
+    Fase 3 del wizard (§1): fotos. Reusa la sección de media entera (galería +
+    uploader). Las fotos persisten al subirse (acción inmediata), así que no
+    hay submit acá: "Atrás" → detalle, "Finalizar" → detail son navegación.
+    """
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+    return render(request, "properties/property_new_fotos.html", {
+        "property": property,
+        "media_items": [_media_item_context(m) for m in property.media.all()],
+        **_gate_context(property),
+        "wizard_steps": WIZARD_STEPS,
+        "current_step": 3,
     })
 
 
@@ -592,14 +644,54 @@ def _owner_initial(property, submitted_owner_id):
     return {"id": str(contact.pk), "text": contact.full_name}
 
 
+def _save_property_scalar(property, form, request):
+    """
+    Escritura escalar compartida por edición y wizard-fase-2. KWARGS
+    EXPLÍCITOS, nunca **cleaned_data: location y externas quedan UNSET a
+    propósito (S3b); un guardado no las borra. features y owner_contact_id
+    viajan (reemplazo). Una sola fuente de esta disciplina — las dos puertas
+    no pueden divergir.
+    """
+    cd = form.cleaned_data
+    update_property(
+        property=property,
+        title=cd["title"],
+        description=cd["description"],
+        address_line=cd["address_line"],
+        city=cd["city"],
+        province=cd["province"],
+        neighborhood=cd["neighborhood"],
+        area_m2=cd["area_m2"],
+        bedrooms=cd["bedrooms"],
+        bathrooms=cd["bathrooms"],
+        parking_spaces=cd["parking_spaces"],
+        year_built=cd["year_built"],
+        youtube_video_url=cd["youtube_video_url"],
+        features=request.POST.getlist("features"),
+        owner_contact_id=cd["owner_contact_id"],
+        actor=request.user,
+    )
+
+
+def _selected_and_owner(request, property, form):
+    # selected_slugs + owner_initial: GET usa lo persistido, POST-error lo
+    # submitted (para no perder ticks ni la selección de owner al re-render).
+    if request.method == "POST":
+        return (
+            set(request.POST.getlist("features")),
+            _owner_initial(property, form.cleaned_data.get("owner_contact_id")),
+        )
+    return (
+        set(property.features.values_list("slug", flat=True)),
+        _owner_initial(property, None),
+    )
+
+
 def property_edit(request, pk):
     """
     Página de edición (§2). GET renderiza el form escalar + la sección de
-    fotos. POST guarda el form escalar vía update_property y vuelve al detail.
-
-    F2a: solo campos escalares. features y owner_contact NO se mandan (kwargs
-    omitidos → UNSET → no se tocan) hasta F2b/F2c. location y externas TAMPOCO
-    se nombran nunca: son de S3b y un guardado escalar no debe borrarlos.
+    fotos. POST guarda vía update_property (helper compartido) y vuelve al
+    detail. location y externas quedan UNSET (S3b).
     """
     try:
         property = Property.objects.get(pk=pk)
@@ -609,38 +701,13 @@ def property_edit(request, pk):
     if request.method == "POST":
         form = PropertyForm(request.POST, instance=property)
         if form.is_valid():
-            cd = form.cleaned_data
-            # KWARGS EXPLÍCITOS, nunca **cd: location y externas quedan UNSET a
-            # propósito — ver PropertyForm. features y owner_contact_id SÍ viajan
-            # (reemplazo total §2/§5; [] / None vacían). Nunca UNSET desde acá.
-            update_property(
-                property=property,
-                title=cd["title"],
-                description=cd["description"],
-                address_line=cd["address_line"],
-                city=cd["city"],
-                province=cd["province"],
-                neighborhood=cd["neighborhood"],
-                area_m2=cd["area_m2"],
-                bedrooms=cd["bedrooms"],
-                bathrooms=cd["bathrooms"],
-                parking_spaces=cd["parking_spaces"],
-                year_built=cd["year_built"],
-                youtube_video_url=cd["youtube_video_url"],
-                features=request.POST.getlist("features"),
-                owner_contact_id=cd["owner_contact_id"],
-                actor=request.user,
-            )
+            _save_property_scalar(property, form, request)
             messages.success(request, "Cambios guardados.")
             return redirect("properties:detail", pk=property.pk)
-        # Error: preservar lo que el socio marcó, no lo persistido (§5).
-        selected_slugs = set(request.POST.getlist("features"))
-        owner_initial = _owner_initial(property, form.cleaned_data.get("owner_contact_id"))
     else:
         form = PropertyForm(instance=property)
-        selected_slugs = set(property.features.values_list("slug", flat=True))
-        owner_initial = _owner_initial(property, None)
 
+    selected_slugs, owner_initial = _selected_and_owner(request, property, form)
     return render(request, "properties/property_edit.html", {
         "property": property,
         "form": form,
