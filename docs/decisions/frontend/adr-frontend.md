@@ -231,6 +231,53 @@ la misma estructura de datos — usar pills de filtro con un único listado.
 
 ---
 
+### Forma de respuesta de una mutación — JSON, HTML o 204
+
+**Decisión:** un endpoint de mutación elige su forma de respuesta por un solo
+criterio — **qué necesita el cliente después**, no qué le resulta cómodo al
+servidor:
+
++ **JSON** cuando la respuesta son *datos que el cliente va a consumir para
+  actuar*. Ej.: `sign` devuelve `{key, url}` para que la cola haga el PUT a R2.
++ **HTML server-rendered** cuando la respuesta es *presentación de estado ya
+  persistido*. Ej.: `confirm` devuelve el card de la foto (+ contador OOB);
+  `set_cover` / `delete` devuelven la galería completa.
++ **204 (No Content)** cuando *no hay ni datos ni presentación nueva* — el
+  cliente ya tiene la verdad que impuso. Ej.: `reorder` exitoso (el DOM
+  optimista del drag ya es correcto; re-renderizar 35 cards no aporta nada).
+
+**Principio (el que decide los casos de borde):** el cliente nunca re-deriva
+una regla que el servidor es dueño de aplicar. La regla "quién es portada",
+"cuántas fotos van", "qué orden es válido" vive en el servidor. Por eso el
+**camino de error re-materializa la verdad** en vez de pedirle al cliente que
+la recalcule: un `reorder` con set desincronizado devuelve `200` + la galería
+re-renderizada (re-sync del DOM optimista a la verdad de DB), no un JSON que
+obligaría al JS a reconstruir el orden. Éxito silencioso (204), error que
+corrige (HTML).
+
+**Fork A descartado — "JSON que muta":** que las mutaciones devolvieran JSON y
+el cliente aplicara los cambios al DOM (mover el badge de portada, decrementar
+el contador). Se descartó porque **duplica la regla de negocio en el JS**: el
+badge de portada, la promoción del heredero al borrar, el contador del gate —
+todas reglas que el servidor ya aplica y que el cliente tendría que reimplementar
+para pintar el resultado. Dos implementaciones de la misma regla divergen. Es el
+mismo argumento de no-duplicar validación entre form y service, un nivel más
+abajo.
+
+**Trade-off:** las mutaciones que devuelven HTML (`set_cover`, `delete`)
+re-renderizan la galería entera (hasta 35 cards) en cada acción, no solo el card
+afectado. Aceptado: el costo es chico frente al beneficio de que la galería
+salga siempre de una sola fuente (DB), sin estado de DOM que reconciliar.
+
+**Relación con los ADR vecinos:** el 204 acá es el mismo mecanismo que
+[Acción exitosa](#respuesta-de-acción-exitosa--http-204--hx-redirect) (HTMX no
+swapea sin cuerpo), pero sin `HX-Redirect` — no hay navegación, solo "no hay
+nada nuevo que mostrar". El error acá NO usa
+[`modal_error`](#respuesta-de-error-de-negocio): un `reorder` es un drag, no hay
+modal en el DOM; su re-render de galería ES la recuperación.
+
+---
+
 ## Layout y spacing
 
 ### Dos columnas desktop — sidebar renderizado dos veces
