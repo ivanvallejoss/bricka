@@ -19,6 +19,12 @@ class PropertyForm(forms.ModelForm):
     (blank=False) — mismo piso que create_property, sin override.
     """
 
+    # owner_contact_id NO es campo del modelo: el combobox reusable postea este
+    # name y update_property lo consume. UUIDField como RentalContractForm —
+    # valida formato, no existencia (el combobox postea ids válidos; la FK/DB
+    # valida existencia). Vacío → None → owner se limpia (reemplazo, no UNSET).
+    owner_contact_id = forms.UUIDField(required=False)
+
     class Meta:
         model = Property
         fields = [
@@ -34,12 +40,7 @@ class PropertyForm(forms.ModelForm):
             "parking_spaces",
             "year_built",
             "youtube_video_url",
-            "owner_contact",
         ]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["owner_contact"].empty_label = "Sin propietario"
 
     def clean(self):
         # Solo UX: no-negativos. Las reglas del dominio las valida
@@ -52,3 +53,26 @@ class PropertyForm(forms.ModelForm):
             if value is not None and value < 0:
                 self.add_error(field, "No puede ser un valor negativo.")
         return cleaned
+
+class PropertyCreateForm(forms.ModelForm):
+    """
+    Fase 1 del wizard (§1): identificación. Crea el borrador vía
+    create_property (.save() nunca). is_external es acá o nunca (prohibido en
+    update_property). La regla is_external → agency_name la valida
+    create_property; NO se duplica acá — la view captura el error como
+    non-field (el toggle Alpine suma required advisory; el server es el juez).
+    """
+    # agency_name NO es campo de Property (vive en ExternalPropertySource);
+    # declarado acá para la fase 1. required=False: el server valida la regla.
+    agency_name = forms.CharField(required=False, max_length=200)
+
+    class Meta:
+        model = Property
+        fields = [
+            "property_type",
+            "address_line",
+            "city",
+            "province",
+            "neighborhood",
+            "is_external",
+        ]
