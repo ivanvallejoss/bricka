@@ -37,5 +37,11 @@
             </button>
         </div>
     </form>
+
+    {% if property.is_external %}
+    <div class="mt-6">
+        {% include "properties/partials/_externas_section.html" %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

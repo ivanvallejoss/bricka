@@ -21,7 +21,12 @@
     {# ── Operación (§8-listing) ── #}
     {% include "properties/partials/_operacion_section.html" %}
 
-    {# Huecos S3b restantes: fuente externa (§6), location (§4). #}           
+    {# ── Fuente externa (§6) — solo si is_external ── #}
+    {% if property.is_external %}
+        {% include "properties/partials/_externas_section.html" %}
+    {% endif %}
+
+    {# Hueco S3b restante: location (§4). #}
 
     {# ── Fotos ── #}
     <div id="fotos" class="scroll-mt-24">

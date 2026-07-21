@@ -1,0 +1,74 @@
+{% comment %}
+Bloque de fuente externa (§6). Se renderiza SOLO si property.is_external — el
+invariante se protege por ausencia, sin toggle. Form propio → update_external_source.
+Contexto: external_form, externas_saved. Swap: el bloque entero (outerHTML).
+agency_name requerido (no se blanquea); source_url y comisión opcionales.
+{% endcomment %}
+<section id="externas-section" class="bg-surface border border-outline rounded-md p-5">
+    <div class="flex items-center justify-between mb-3">
+        <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+            Fuente externa
+        </p>
+        {% if externas_saved %}
+        <span class="text-xs text-success-text">Guardado</span>
+        {% endif %}
+    </div>
+
+    <form hx-post="{% url 'properties:external_source_update' property.pk %}"
+          hx-target="#externas-section"
+          hx-swap="outerHTML"
+          hx-disabled-elt="find button[type='submit']"
+          class="flex flex-col gap-3">
+
+        <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                Inmobiliaria
+            </label>
+            <input type="text" name="agency_name" value="{{ external_form.agency_name.value|default:'' }}"
+                   class="w-full px-3 py-2 text-sm bg-surface border rounded
+                          focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                          focus:border-primary-container transition-colors
+                          {% if external_form.agency_name.errors %}border-danger-text{% else %}border-outline{% endif %}">
+            {% if external_form.agency_name.errors %}
+            <p class="text-xs text-danger-text">{{ external_form.agency_name.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                URL de origen <span class="normal-case text-on-surface-variant/60">(opcional)</span>
+            </label>
+            <input type="url" name="source_url" value="{{ external_form.source_url.value|default:'' }}"
+                   class="w-full px-3 py-2 text-sm bg-surface border rounded
+                          focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                          focus:border-primary-container transition-colors
+                          {% if external_form.source_url.errors %}border-danger-text{% else %}border-outline{% endif %}">
+            {% if external_form.source_url.errors %}
+            <p class="text-xs text-danger-text">{{ external_form.source_url.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                Comisión acordada (%) <span class="normal-case text-on-surface-variant/60">(opcional)</span>
+            </label>
+            <input type="number" step="0.01" name="agreed_commission_percent"
+                   value="{{ external_form.agreed_commission_percent.value|default:'' }}"
+                   class="w-40 px-3 py-2 text-sm bg-surface border rounded tabular-nums
+                          focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                          focus:border-primary-container transition-colors
+                          {% if external_form.agreed_commission_percent.errors %}border-danger-text{% else %}border-outline{% endif %}">
+            {% if external_form.agreed_commission_percent.errors %}
+            <p class="text-xs text-danger-text">{{ external_form.agreed_commission_percent.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit"
+                    class="px-4 py-2 rounded bg-primary-container text-on-primary text-sm font-medium
+                           hover:bg-primary transition-colors">
+                Guardar fuente
+            </button>
+        </div>
+    </form>
+</section>
