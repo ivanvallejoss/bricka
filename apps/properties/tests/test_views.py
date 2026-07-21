@@ -1,11 +1,14 @@
 import json
 import pytest
+import httpx
 
 from uuid import uuid4
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from decimal import Decimal
 
 from django.urls import reverse
+from django.core.cache import cache
+
 
 from botocore.exceptions import ClientError
 
@@ -726,3 +729,51 @@ class TestExternasBlockRender:
         prop = PropertyFactory()
         resp = auth_client.get(reverse("properties:edit", args=[prop.pk]))
         assert 'id="externas-section"' not in resp.content.decode()
+
+
+class TestGeocodeProxy:
+    @pytest.fixture(autouse=True)
+    def _reset_gate(self):
+        from apps.common.geocoding import _RATE_LIMIT_KEY
+        cache.delete(_RATE_LIMIT_KEY)
+        yield
+        cache.delete(_RATE_LIMIT_KEY)
+
+    @patch("apps.common.geocoding.httpx.get")
+    def test_returns_result(self, mock_get, auth_client, db):
+        resp = MagicMock()
+        resp.json.return_value = [{
+            "lat": "-27.45", "lon": "-58.98", "display_name": "Resistencia",
+        }]
+        mock_get.return_value = resp
+        r = auth_client.get(reverse("geocode"), {"q": "Resistencia"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["available"] is True
+        assert data["result"]["lat"] == -27.45
+        assert data["result"]["display_name"] == "Resistencia"
+
+    @patch("apps.common.geocoding.httpx.get")
+    def test_no_result(self, mock_get, auth_client, db):
+        resp = MagicMock()
+        resp.json.return_value = []
+        mock_get.return_value = resp
+        assert auth_client.get(reverse("geocode"), {"q": "xyz"}).json() == {
+            "available": True, "result": None,
+        }
+
+    @patch("apps.common.geocoding.httpx.get", side_effect=httpx.TimeoutException("t"))
+    def test_unavailable(self, mock_get, auth_client, db):
+        assert auth_client.get(reverse("geocode"), {"q": "Resistencia"}).json() == {
+            "available": False, "result": None,
+        }
+
+    def test_empty_query_returns_null(self, auth_client, db):
+        assert auth_client.get(reverse("geocode"), {"q": "  "}).json() == {
+            "available": True, "result": None,
+        }
+
+    def test_requires_backoffice_auth(self, client, db):
+        r = client.get(reverse("geocode"), {"q": "Resistencia"})
+        assert r.status_code == 302
+        assert "next=/backoffice/geo/geocode/" in r.url

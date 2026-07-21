@@ -53,6 +53,7 @@ from apps.common.storage import (
     public_media_exists,
     delete_public_media,
 )
+from apps.common.geocoding import geocode_address, GeocodeUnavailable
 
 from apps.contacts.models import Contact
 
@@ -959,3 +960,29 @@ def listing_price(request, pk, listing_id):
         "properties/partials/_operacion_listing_row.html",
         _listing_row_context(listing, flow, price_error=form.errors["price"][0]),
     )
+
+
+def geocode(request):
+    """
+    Proxy de geocoding (§4). GET ?q=<dirección>. Vive bajo /backoffice/ → detrás
+    del middleware de S8; nunca abierto a internet (un proxy sin auth quema la
+    cuota de Nominatim y la IP ante su ban). Schema uniforme {available, result}:
+      - {"available": true,  "result": {lat, lon, display_name}}  → match.
+      - {"available": true,  "result": null}                       → sin resultado.
+      - {"available": false, "result": null}                       → no disponible
+        (timeout, red, o rate-gate). El frontend cae a centro default + pin manual.
+    """
+    query = request.GET.get("q", "").strip()
+    if not query:
+        return JsonResponse({"available": True, "result": None})
+    try:
+        result = geocode_address(query)
+    except GeocodeUnavailable:
+        return JsonResponse({"available": False, "result": None})
+    if result is None:
+        return JsonResponse({"available": True, "result": None})
+    return JsonResponse({"available": True, "result": {
+        "lat": result.lat,
+        "lon": result.lon,
+        "display_name": result.display_name,
+    }})

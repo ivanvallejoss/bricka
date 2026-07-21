@@ -173,6 +173,13 @@ AGENCY_PHONE   = env.str("AGENCY_PHONE", default="")
 AGENCY_EMAIL   = env.str("AGENCY_EMAIL", default="")
 
 
+# ── Datos del Geocoding ─────────────────────────────────────────────
+# Nominatim (geocoding) — cliente en common/geocoding.py, proxy en properties.
+# UA identificable = requisito de la política de uso; el contacto es público.
+NOMINATIM_BASE_URL = env.str("NOMINATIM_BASE_URL", default="https://nominatim.openstreetmap.org")
+NOMINATIM_USER_AGENT = env.str("NOMINATIM_USER_AGENT", default="Bricka/1.0 (+https://bricka.com.ar)")
+NOMINATIM_TIMEOUT = env.float("NOMINATIM_TIMEOUT", default=5.0)
+
 
 # Static
 STATIC_URL = "static/"

@@ -83,6 +83,10 @@ por decisión de los socios (2026-07-14, "no necesario").
 Criterio: DNS nunca se adelanta al destino — no se crean registros hacia
 infraestructura inexistente (anti dangling-DNS).
 
+### Dependencia outbound - GeoCoding
+
+/backoffice/geo/geocode/ hace una llamada saliente a nominatim.openstreetmap.org (server-side, no el browser). En Hetzner el egress es libre; si se agrega allowlist de egress, sumar ese host. Rate limit 1 req/s por política, enforzado con gate Redis en common/geocoding.py. Cache de resultados = futuro.
+
 ## R2 — ejecución
 
 - Cuatro buckets creados: `bricka-media`, `bricka-documents`,
