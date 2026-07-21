@@ -16,6 +16,7 @@ urlpatterns = [
     path("<uuid:pk>/edit/", views.property_edit, name="edit"),
     path("<uuid:pk>/new/detalle/", views.property_new_detalle, name="new_detalle"),
     path("<uuid:pk>/new/fotos/", views.property_new_fotos, name="new_fotos"),
+    path("<uuid:pk>/new/operacion/", views.property_new_operacion, name="new_operacion"),
     path("<uuid:pk>/listings/", views.listing_create, name="listing_create"),
     path("<uuid:pk>/listings/<uuid:listing_id>/publish/", views.listing_publish, name="listing_publish"),
     path("<uuid:pk>/listings/<uuid:listing_id>/price/", views.listing_price, name="listing_price"),

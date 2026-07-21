@@ -68,7 +68,7 @@ from apps.listings.services import (
 )
 from apps.listings.exceptions import ListingValidationError, ListingPublicationRequirementsError
 from apps.listings.choices import OperationType, PricePeriod, ListingStatus
-from .checklist import FLOW_EDIT, build_publication_checklist
+from .checklist import FLOW_EDIT, FLOW_WIZARD, build_publication_checklist
 
 
 _BADGE_MAP = {
@@ -77,7 +77,7 @@ _BADGE_MAP = {
     PaymentStatus.OVERDUE: BadgeContext(text="En mora",   style="danger"),
 }
 
-WIZARD_STEPS = [(1, "Identificación"), (2, "Detalle"), (3, "Fotos")]
+WIZARD_STEPS = [(1, "Identificación"), (2, "Detalle"), (3, "Fotos"), (4, "Operación")]
 
 # Resolución del gap de period (enmienda S3b): el form de alta expone
 # venta/alquiler; period se deriva de operation_type. Espeja lo que el seed ya
@@ -177,6 +177,25 @@ def property_new_fotos(request, pk):
         **_gate_context(property),
         "wizard_steps": WIZARD_STEPS,
         "current_step": 3,
+    })
+
+
+def property_new_operacion(request, pk):
+    """
+    Fase 4 del wizard (§1, §8-listing): operación. Opcional. Reusa la sección de
+    operación entera con FLOW_WIZARD, así los deep links del checklist (si se
+    publica y el gate rechaza) apuntan a las fases del wizard, no a las anclas de
+    edición. La sección persiste por HTMX (create/publish/price); acá no hay
+    submit: "Atrás" → fotos, "Finalizar" → detail son navegación.
+    """
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+    return render(request, "properties/property_new_operacion.html", {
+        **_operacion_section_context(property, FLOW_WIZARD),
+        "wizard_steps": WIZARD_STEPS,
+        "current_step": 4,
     })
 
 

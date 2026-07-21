@@ -572,6 +572,17 @@ class TestListingPublish:
         listing = ListingFactory(property=prop, status=ListingStatus.DRAFT)
         assert auth_client.get(self._url(prop, listing)).status_code == 405
 
+    def test_publish_gate_reject_wizard_flow_links_to_phases(self, auth_client, db):
+        prop = PropertyFactory(description="Corto")  # sin fotos ni descripción → gate falla
+        listing = ListingFactory(property=prop, operation_type=OperationType.SALE,
+                                 status=ListingStatus.DRAFT)
+        resp = auth_client.post(self._url(prop, listing), {"flow": "wizard"})
+        assert resp.status_code == 200
+        assert resp.get("HX-Retarget") == "#modal-container"
+        content = resp.content.decode()
+        assert reverse("properties:new_fotos", args=[prop.pk]) in content
+        assert reverse("properties:new_detalle", args=[prop.pk]) in content
+
 
 class TestListingPrice:
     def _url(self, prop, listing):
@@ -637,3 +648,21 @@ class TestOperacionAvailability:
                        status=ListingStatus.CLOSED)
         ctx = _operacion_section_context(prop, FLOW_EDIT)
         assert [v for v, _ in ctx["available_operations"]] == ["sale", "rent"]
+
+
+class TestPropertyNewOperacion:
+    def test_renders_operacion_section(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.get(reverse("properties:new_operacion", args=[prop.pk]))
+        assert resp.status_code == 200
+        assert 'id="operacion-section"' in resp.content.decode()
+
+    def test_renders_with_wizard_flow(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.get(reverse("properties:new_operacion", args=[prop.pk]))
+        assert 'name="flow" value="wizard"' in resp.content.decode()
+
+    def test_not_found(self, auth_client, db):
+        import uuid
+        resp = auth_client.get(reverse("properties:new_operacion", args=[uuid.uuid4()]))
+        assert resp.status_code == 404
