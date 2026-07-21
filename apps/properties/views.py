@@ -480,11 +480,23 @@ def _gate_context(property):
 
 
 def _operacion_section_context(property, flow, listing_form=None):
+    listings = list(get_listings_for_property(property.pk))
+    # Capa UX durable contra drafts duplicados: no ofrecer un tipo que ya tiene
+    # un listing no-cerrado. NO es la garantía — esa es la constraint + el chequeo
+    # del service (ventana de unicidad). Acá solo se evita ofrecer lo que fallaría.
+    # closed no bloquea (permite re-listar tras un cierre).
+    taken = {l.operation_type for l in listings if l.status != ListingStatus.CLOSED}
+    available_operations = [
+        (op.value, op.label)
+        for op in (OperationType.SALE, OperationType.RENT)
+        if op.value not in taken
+    ]
     return {
         "property": property,
-        "listings": list(get_listings_for_property(property.pk)),
+        "listings": listings,
         "listing_form": listing_form if listing_form is not None else ListingCreateForm(),
         "flow": flow,
+        "available_operations": available_operations,
     }
 
 

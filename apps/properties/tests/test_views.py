@@ -21,6 +21,8 @@ from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
 from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory
 from apps.properties.models import PropertyMedia, Feature, Property
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
+from apps.properties.views import _operacion_section_context
+from apps.properties.checklist import FLOW_EDIT
 
 
 @pytest.fixture
@@ -598,3 +600,40 @@ class TestListingPrice:
         prop = PropertyFactory()
         listing = ListingFactory(property=prop)
         assert auth_client.get(self._url(prop, listing)).status_code == 405
+
+
+class TestOperacionAvailability:
+    def test_both_available_when_no_listings(self, db):
+        prop = PropertyFactory()
+        ctx = _operacion_section_context(prop, FLOW_EDIT)
+        assert [v for v, _ in ctx["available_operations"]] == ["sale", "rent"]
+
+    def test_draft_sale_removes_sale(self, db):
+        prop = PropertyFactory()
+        ListingFactory(property=prop, operation_type=OperationType.SALE,
+                       status=ListingStatus.DRAFT)
+        ctx = _operacion_section_context(prop, FLOW_EDIT)
+        assert [v for v, _ in ctx["available_operations"]] == ["rent"]
+
+    def test_published_sale_removes_sale(self, db):
+        prop = PropertyFactory()
+        ListingFactory(property=prop, operation_type=OperationType.SALE,
+                       status=ListingStatus.PUBLISHED)
+        ctx = _operacion_section_context(prop, FLOW_EDIT)
+        assert [v for v, _ in ctx["available_operations"]] == ["rent"]
+
+    def test_both_taken_leaves_none(self, db):
+        prop = PropertyFactory()
+        ListingFactory(property=prop, operation_type=OperationType.SALE,
+                       status=ListingStatus.DRAFT)
+        ListingFactory(property=prop, operation_type=OperationType.RENT,
+                       status=ListingStatus.PUBLISHED)
+        ctx = _operacion_section_context(prop, FLOW_EDIT)
+        assert ctx["available_operations"] == []
+
+    def test_closed_does_not_block(self, db):
+        prop = PropertyFactory()
+        ListingFactory(property=prop, operation_type=OperationType.SALE,
+                       status=ListingStatus.CLOSED)
+        ctx = _operacion_section_context(prop, FLOW_EDIT)
+        assert [v for v, _ in ctx["available_operations"]] == ["sale", "rent"]

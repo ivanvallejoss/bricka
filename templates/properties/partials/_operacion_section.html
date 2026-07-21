@@ -20,6 +20,7 @@ la vertical publicación.
     <p class="text-sm text-on-surface-variant mb-5">Sin operaciones todavía.</p>
     {% endif %}
 
+    {% if available_operations %}
     <form hx-post="{% url 'properties:listing_create' property.pk %}"
           hx-target="#operacion-section"
           hx-swap="outerHTML"
@@ -44,9 +45,9 @@ la vertical publicación.
                                focus:outline-none focus:ring-2 focus:ring-primary-container/20
                                focus:border-primary-container transition-colors
                                {% if listing_form.operation_type.errors %}border-danger-text{% else %}border-outline{% endif %}">
-                    {% for value, label in listing_form.operation_type.field.choices %}
+                    {% for value, label in available_operations %}
                     <option value="{{ value }}"
-                            {% if listing_form.operation_type.value == value %}selected{% endif %}>
+                            {% if available_operations == value %}selected{% endif %}>
                         {{ label }}
                     </option>
                     {% endfor %}
@@ -112,4 +113,9 @@ la vertical publicación.
             </button>
         </div>
     </form>
+    {% else %}
+    <p class="text-sm text-on-surfac-variant border-t border-outline pt-4">
+        Ya hay una operacion de cada tipo para esta propiedad.
+    </p>
+    {% endif %}
 </section>
