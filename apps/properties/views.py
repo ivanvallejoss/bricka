@@ -8,6 +8,8 @@ from django.http import Http404, HttpResponse, HttpResponseNotAllowed, JsonRespo
 from django.core.paginator import Paginator
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib import messages
+from django.contrib.gis.geos import Point
+from django.conf import settings
 
 from urllib.parse import urlencode
 
@@ -35,7 +37,14 @@ from .selectors import (
     )
 from .contexts import BadgeContext, PropertyListContext, MediaItemContext
 from .exceptions import PropertyValidationError
-from .forms import PropertyForm, PropertyCreateForm, ListingCreateForm, ListingPriceForm, ExternalSourceForm
+from .forms import (
+    PropertyForm, 
+    PropertyCreateForm, 
+    ListingCreateForm, 
+    ListingPriceForm, 
+    ExternalSourceForm,
+    LocationForm,
+    )
 from .choices import FeatureCategory, PropertyType
 
 from apps.billing.selectors import (
@@ -160,6 +169,7 @@ def property_new_detalle(request, pk):
         "wizard_steps": WIZARD_STEPS,
         "current_step": 2,
         **_externas_section_context(property),
+        **_location_section_context(property),
     })
 
 
@@ -538,6 +548,23 @@ def _externas_section_context(property, external_form=None, saved=False):
     }
 
 
+def _location_section_context(property):
+    center = settings.GEO_CITY_CENTERS.get(property.city, settings.GEO_DEFAULT_CENTER)
+    existing = None
+    if property.location:
+        existing = [property.location.y, property.location.x]  # [lat, lng]
+        center = existing
+    address_query = ", ".join(
+        p for p in [property.address_line, property.city, property.province] if p
+    )
+    return {
+        "property": property,
+        "map_center_json": json.dumps(list(center)),
+        "existing_location_json": json.dumps(existing),
+        "address_query": address_query,
+    }
+
+
 def _listing_row_context(listing, flow, price_error=None):
     return {"listing": listing, "flow": flow, "price_error": price_error}
 
@@ -809,6 +836,7 @@ def property_edit(request, pk):
         "min_description": MIN_DESCRIPTION_LENGTH,
         **_operacion_section_context(property, FLOW_EDIT),
         **_externas_section_context(property),
+        **_location_section_context(property),
     }
     return render(request, "properties/property_edit.html", context)
 
@@ -986,3 +1014,29 @@ def geocode(request):
         "lon": result.lon,
         "display_name": result.display_name,
     }})
+
+
+def location_update(request, pk):
+    """
+    Persiste la ubicación de una propiedad (§4, §9). POST-only, lat/lng. Arma el
+    Point (footgun: Point(x=longitud, y=latitud)) y persiste vía update_property
+    — location queda aislado por UNSET, el form escalar nunca lo pisa. Devuelve
+    JSON: el mapa es un Leaflet vivo, re-renderear el bloque lo destruiría, así
+    que el JS actualiza el estado con la respuesta en vez de swappear.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+
+    form = LocationForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({"saved": False, "errors": form.errors}, status=400)
+
+    point = Point(form.cleaned_data["lng"], form.cleaned_data["lat"], srid=4326)
+    update_property(property=property, location=point, actor=request.user)
+    return JsonResponse({"saved": True})
+
+

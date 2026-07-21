@@ -10,6 +10,14 @@
     </a>
 {% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-3xl space-y-6">
 
@@ -26,7 +34,8 @@
         {% include "properties/partials/_externas_section.html" %}
     {% endif %}
 
-    {# Hueco S3b restante: location (§4). #}
+    {# ── Ubicación (§4) ── #}
+    {% include "properties/partials/_location_section.html" %}
 
     {# ── Fotos ── #}
     <div id="fotos" class="scroll-mt-24">

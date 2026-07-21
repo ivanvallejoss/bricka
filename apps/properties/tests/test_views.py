@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from django.urls import reverse
 from django.core.cache import cache
-
+from django.contrib.gis.geos import Point
 
 from botocore.exceptions import ClientError
 
@@ -24,7 +24,7 @@ from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
 from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory, ExternalPropertySourceFactory
 from apps.properties.models import PropertyMedia, Feature, Property
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
-from apps.properties.views import _operacion_section_context
+from apps.properties.views import _operacion_section_context, _location_section_context
 from apps.properties.checklist import FLOW_EDIT
 
 
@@ -777,3 +777,63 @@ class TestGeocodeProxy:
         r = client.get(reverse("geocode"), {"q": "Resistencia"})
         assert r.status_code == 302
         assert "next=/backoffice/geo/geocode/" in r.url
+
+
+class TestLocationUpdate:
+    def _url(self, prop):
+        return reverse("properties:location_update", args=[prop.pk])
+
+    def test_persists_point(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(self._url(prop), {"lat": "-27.4512", "lng": "-58.9866"})
+        assert resp.status_code == 200
+        assert resp.json() == {"saved": True}
+        prop.refresh_from_db()
+        assert prop.location is not None
+        # el footgun, verificado: Point(x=lng, y=lat)
+        assert round(prop.location.x, 4) == -58.9866   # longitud
+        assert round(prop.location.y, 4) == -27.4512   # latitud
+
+    def test_invalid_lat_rejected(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(self._url(prop), {"lat": "200", "lng": "-58.9"})
+        assert resp.status_code == 400
+        prop.refresh_from_db()
+        assert prop.location is None
+
+    def test_missing_coord_rejected(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(self._url(prop), {"lat": "-27.4"})
+        assert resp.status_code == 400
+
+    def test_get_not_allowed(self, auth_client, db):
+        prop = PropertyFactory()
+        assert auth_client.get(self._url(prop)).status_code == 405
+
+
+class TestLocationSectionContext:
+    def test_center_is_city_default_without_location(self, db, settings):
+        settings.GEO_CITY_CENTERS = {"Resistencia": [-27.45, -58.98]}
+        settings.GEO_DEFAULT_CENTER = [0.0, 0.0]
+        prop = PropertyFactory(city="Resistencia", location=None)
+        ctx = _location_section_context(prop)
+        assert json.loads(ctx["map_center_json"]) == [-27.45, -58.98]
+        assert json.loads(ctx["existing_location_json"]) is None
+
+    def test_falls_back_to_default_for_unknown_city(self, db, settings):
+        settings.GEO_CITY_CENTERS = {"Resistencia": [-27.45, -58.98]}
+        settings.GEO_DEFAULT_CENTER = [-34.6, -58.4]
+        prop = PropertyFactory(city="Corrientes")
+        ctx = _location_section_context(prop)
+        assert json.loads(ctx["map_center_json"]) == [-34.6, -58.4]
+
+    def test_existing_location_sets_center_and_pin(self, db):
+        prop = PropertyFactory(location=Point(-58.98, -27.45, srid=4326))
+        ctx = _location_section_context(prop)
+        assert json.loads(ctx["existing_location_json"]) == [-27.45, -58.98]  # [lat, lng]
+        assert json.loads(ctx["map_center_json"]) == [-27.45, -58.98]
+
+    def test_edit_page_includes_map(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.get(reverse("properties:edit", args=[prop.pk]))
+        assert 'id="location-map"' in resp.content.decode()

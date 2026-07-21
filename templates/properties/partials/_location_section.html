@@ -1,0 +1,130 @@
+{% comment %}
+Bloque de ubicación (§4). Leaflet + geocoding vía el proxy /backoffice/geo/.
+"Buscar" geocodifica; click/drag ubican el pin manual; "Confirmar" persiste el
+Point vía location_update. NUNCA bloquea: sin resultado / caído → pin manual o
+seguir sin ubicar; sin Leaflet → el bloque queda vacío y el resto de la página
+anda. Contexto: property, map_center_json, existing_location_json, address_query.
+Leaflet se carga en el extra_js de la página; el init va inline, envuelto en
+DOMContentLoaded (corre después del script de Leaflet). Config server-side por
+data-attributes JSON + {% templatetag openblock %} url {% templatetag closeblock %}
+/ csrf_token (nada de dato de usuario inyectado en JS).
+{% endcomment %}
+<section class="bg-surface border border-outline rounded-md p-5">
+    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+        Ubicación <span class="normal-case text-on-surface-variant/60">(opcional)</span>
+    </p>
+
+    <div class="flex items-center gap-2 mb-3">
+        <input type="text" id="location-address" value="{{ address_query }}"
+               placeholder="Dirección a buscar"
+               class="flex-1 px-3 py-2 text-sm bg-surface border border-outline rounded
+                      focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                      focus:border-primary-container transition-colors">
+        <button type="button" id="location-search"
+                class="px-3 py-2 text-sm font-medium text-on-surface-variant border border-outline rounded
+                       hover:bg-surface-container transition-colors whitespace-nowrap">
+            Buscar en mapa
+        </button>
+    </div>
+
+    <div id="location-map"
+         data-center="{{ map_center_json }}"
+         data-existing="{{ existing_location_json }}"
+         class="relative z-0 h-64 w-full rounded-md border border-outline"></div>
+
+    <p id="location-status" class="text-xs text-on-surface-variant mt-2 min-h-[1rem]"></p>
+
+    <div class="flex justify-end mt-2">
+        <button type="button" id="location-confirm" disabled
+                class="px-4 py-2 rounded bg-primary-container text-on-primary text-sm font-medium
+                       hover:bg-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Confirmar ubicación
+        </button>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const el = document.getElementById("location-map");
+        if (!el || typeof L === "undefined") return;  // sin Leaflet: no bloquea
+
+        const center = JSON.parse(el.dataset.center);
+        const existing = JSON.parse(el.dataset.existing);
+        const geocodeUrl = "{% url 'geocode' %}";
+        const confirmUrl = "{% url 'properties:location_update' property.pk %}";
+        const csrfToken = "{{ csrf_token }}";
+
+        const statusEl = document.getElementById("location-status");
+        const confirmBtn = document.getElementById("location-confirm");
+        const searchBtn = document.getElementById("location-search");
+        const addressInput = document.getElementById("location-address");
+        const setStatus = (m) => { statusEl.textContent = m; };
+        const manual = "Ubicá el pin manualmente en el mapa (click o arrastrá).";
+
+        const map = L.map(el).setView(center, existing ? 16 : 13);
+        L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19, attribution: "© OpenStreetMap",
+        }).addTo(map);
+        setTimeout(() => map.invalidateSize(), 0);
+
+        let marker = null;
+        function setMarker(lat, lng) {
+            if (marker) {
+                marker.setLatLng([lat, lng]);
+            } else {
+                marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+                marker.on("dragend", () => setStatus(""));
+            }
+            confirmBtn.disabled = false;
+        }
+
+        async function runSearch(isAuto) {
+            const q = addressInput.value.trim();
+            if (!q) return;
+            if (!isAuto) setStatus("Buscando…");
+            try {
+                const resp = await fetch(geocodeUrl + "?q=" + encodeURIComponent(q));
+                const data = await resp.json();
+                if (!data.available || !data.result) {
+                    if (!isAuto) setStatus(
+                        (data.available ? "No encontramos esa dirección. "
+                                        : "El buscador no está disponible. ") + manual
+                    );
+                    return;  // auto: silencioso, queda en el centro default
+                }
+                map.setView([data.result.lat, data.result.lon], 16);
+                setMarker(data.result.lat, data.result.lon);
+                setStatus(data.result.display_name);
+            } catch (err) {
+                if (!isAuto) setStatus("El buscador no está disponible. " + manual);
+            }
+        }
+
+        if (existing) setMarker(existing[0], existing[1]);
+        map.on("click", (e) => { setMarker(e.latlng.lat, e.latlng.lng); setStatus(""); });
+        searchBtn.addEventListener("click", () => runSearch(false));
+
+        // auto-geocode al cargar: sin ubicación guardada + con dirección pre-cargada
+        if (!existing && addressInput.value.trim()) runSearch(true);
+
+        confirmBtn.addEventListener("click", async () => {
+            if (!marker) return;
+            const pos = marker.getLatLng();
+            setStatus("Guardando…");
+            try {
+                const resp = await fetch(confirmUrl, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": csrfToken,
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    body: "lat=" + pos.lat + "&lng=" + pos.lng,
+                });
+                const data = await resp.json();
+                setStatus(data.saved ? "Ubicación guardada." : "No se pudo guardar.");
+            } catch (err) {
+                setStatus("No se pudo guardar.");
+            }
+        });
+    });
+    </script>
+</section>

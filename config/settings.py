@@ -179,6 +179,12 @@ AGENCY_EMAIL   = env.str("AGENCY_EMAIL", default="")
 NOMINATIM_BASE_URL = env.str("NOMINATIM_BASE_URL", default="https://nominatim.openstreetmap.org")
 NOMINATIM_USER_AGENT = env.str("NOMINATIM_USER_AGENT", default="Bricka/1.0 (+https://bricka.com.ar)")
 NOMINATIM_TIMEOUT = env.float("NOMINATIM_TIMEOUT", default=5.0)
+# Geo — centro default del mapa cuando no hay ubicación ni geocoding (§4).
+# (lat, lng). Resistencia, Chaco.
+GEO_DEFAULT_CENTER = (-27.4512, -58.9866)
+GEO_CITY_CENTERS = {
+    "Resistencia": (-27.4512, -58.9866),
+}
 
 
 # Static

@@ -10,6 +10,14 @@
     </a>
 {% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-2xl">
     {% include "properties/partials/_wizard_steps.html" %}
@@ -43,5 +51,8 @@
         {% include "properties/partials/_externas_section.html" %}
     </div>
     {% endif %}
+    <div class="mt-6">
+        {% include "properties/partials/_location_section.html" %}
+    </div>
 </div>
 {% endblock %}

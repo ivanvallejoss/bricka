@@ -129,3 +129,10 @@ class ExternalSourceForm(forms.Form):
     agreed_commission_percent = forms.DecimalField(
         max_digits=5, decimal_places=2, required=False,
     )
+
+
+class LocationForm(forms.Form):
+    """Confirma la ubicación de una propiedad (§4). lat/lng validados a rango;
+    la view arma el Point — ojo con el footgun Point(x=lng, y=lat)."""
+    lat = forms.FloatField(min_value=-90, max_value=90)
+    lng = forms.FloatField(min_value=-180, max_value=180)

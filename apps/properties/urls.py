@@ -26,6 +26,7 @@ urlpatterns = [
     path("<uuid:pk>/media/sign/", views.media_sign, name="media_sign"),
     path("<uuid:pk>/media/confirm/", views.media_confirm, name="media_confirm"),
     path("<uuid:pk>/media/reorder/", views.media_reorder, name="media_reorder"),
+    path("<uuid:pk>/location/", views.location_update, name="location_update"),
     path("media/<uuid:id>/set-cover/", views.media_set_cover, name="media_set_cover"),
     path("media/<uuid:id>/delete/", views.media_delete, name="media_delete"),
 ]
