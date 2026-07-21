@@ -1,8 +1,10 @@
 import json
+import pytest
+
 from uuid import uuid4
 from unittest.mock import MagicMock
+from decimal import Decimal
 
-import pytest
 from django.urls import reverse
 
 from botocore.exceptions import ClientError
@@ -10,6 +12,10 @@ from botocore.exceptions import ClientError
 from apps.common import storage
 
 from apps.contacts.tests.factories import ContactFactory
+
+from apps.listings.tests.factories import ListingFactory
+from apps.listings.models import Listing, ListingPriceHistory
+from apps.listings.choices import ListingStatus, OperationType, PricePeriod
 
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
 from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory
@@ -433,3 +439,162 @@ class TestPropertyNewFotos:
         assert resp.status_code == 200
         assert b'id="media-gallery"' in resp.content
         assert b"mediaUploader(" in resp.content
+
+
+class TestListingCreate:
+    def _url(self, prop):
+        return reverse("properties:listing_create", args=[prop.pk])
+
+    def test_creates_draft_listing(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(self._url(prop), {
+            "operation_type": OperationType.SALE, "price": "120000", "currency": "USD",
+        })
+        assert resp.status_code == 200
+        listing = Listing.objects.get(property=prop)
+        assert listing.status == ListingStatus.DRAFT
+        assert listing.operation_type == OperationType.SALE
+
+    def test_sale_derives_total_period(self, auth_client, db):
+        prop = PropertyFactory()
+        auth_client.post(self._url(prop), {
+            "operation_type": OperationType.SALE, "price": "120000", "currency": "USD",
+        })
+        assert Listing.objects.get(property=prop).period == PricePeriod.TOTAL
+
+    def test_rent_derives_monthly_period(self, auth_client, db):
+        prop = PropertyFactory()
+        auth_client.post(self._url(prop), {
+            "operation_type": OperationType.RENT, "price": "50000", "currency": "ARS",
+        })
+        assert Listing.objects.get(property=prop).period == PricePeriod.MONTHLY
+
+    def test_price_min_acceptable_optional(self, auth_client, db):
+        prop = PropertyFactory()
+        auth_client.post(self._url(prop), {
+            "operation_type": OperationType.SALE, "price": "120000", "currency": "USD",
+        })
+        assert Listing.objects.get(property=prop).price_min_acceptable is None
+
+    def test_price_min_acceptable_persists(self, auth_client, db):
+        prop = PropertyFactory()
+        auth_client.post(self._url(prop), {
+            "operation_type": OperationType.SALE, "price": "120000",
+            "currency": "USD", "price_min_acceptable": "110000",
+        })
+        assert Listing.objects.get(property=prop).price_min_acceptable == Decimal("110000")
+
+    def test_invalid_operation_type_creates_nothing(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(self._url(prop), {
+            "operation_type": OperationType.TEMPORARY_RENT, "price": "50000", "currency": "ARS",
+        })
+        assert resp.status_code == 200
+        assert not Listing.objects.filter(property=prop).exists()
+
+    def test_missing_price_creates_nothing(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.post(self._url(prop), {
+            "operation_type": OperationType.SALE, "currency": "USD",
+        })
+        assert resp.status_code == 200
+        assert not Listing.objects.filter(property=prop).exists()
+
+    def test_unicidad_race_creates_nothing(self, auth_client, db):
+        prop = PropertyFactory()
+        ListingFactory(property=prop, operation_type=OperationType.SALE,
+                       status=ListingStatus.PUBLISHED)
+        resp = auth_client.post(self._url(prop), {
+            "operation_type": OperationType.SALE, "price": "120000", "currency": "USD",
+        })
+        assert resp.status_code == 200
+        assert Listing.objects.filter(
+            property=prop, operation_type=OperationType.SALE
+        ).count() == 1
+
+    def test_get_not_allowed(self, auth_client, db):
+        prop = PropertyFactory()
+        assert auth_client.get(self._url(prop)).status_code == 405
+
+
+class TestListingPublish:
+    def _url(self, prop, listing):
+        return reverse("properties:listing_publish", args=[prop.pk, listing.id])
+
+    def test_publish_success_returns_row(self, auth_client, db):
+        prop = PropertyFactory(publishable=True)
+        listing = ListingFactory(property=prop, operation_type=OperationType.SALE,
+                                 status=ListingStatus.DRAFT)
+        resp = auth_client.post(self._url(prop, listing), {"flow": "edit"})
+        assert resp.status_code == 200
+        assert resp.get("HX-Retarget") is None
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.PUBLISHED
+
+    def test_publish_gate_reject_returns_checklist_modal(self, auth_client, db):
+        prop = PropertyFactory()  # sin fotos ni descripción → gate falla
+        listing = ListingFactory(property=prop, operation_type=OperationType.SALE,
+                                 status=ListingStatus.DRAFT)
+        resp = auth_client.post(self._url(prop, listing), {"flow": "edit"})
+        assert resp.status_code == 200
+        assert resp.get("HX-Retarget") == "#modal-container"
+        assert "No se puede publicar" in resp.content.decode()
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.DRAFT
+
+    def test_publish_unicidad_returns_modal_error(self, auth_client, db):
+        prop = PropertyFactory()
+        ListingFactory(property=prop, operation_type=OperationType.SALE,
+                       status=ListingStatus.PUBLISHED)
+        draft = ListingFactory(property=prop, operation_type=OperationType.SALE,
+                               status=ListingStatus.DRAFT)
+        resp = auth_client.post(self._url(prop, draft), {"flow": "edit"})
+        assert resp.status_code == 200
+        assert resp.get("HX-Retarget") == "#modal-container"
+        assert "Ya existe un listing activo" in resp.content.decode()
+        draft.refresh_from_db()
+        assert draft.status == ListingStatus.DRAFT
+
+    def test_publish_wrong_property_404(self, auth_client, db):
+        prop_a = PropertyFactory()
+        prop_b = PropertyFactory()
+        listing = ListingFactory(property=prop_a, status=ListingStatus.DRAFT)
+        resp = auth_client.post(
+            reverse("properties:listing_publish", args=[prop_b.pk, listing.id]),
+            {"flow": "edit"},
+        )
+        assert resp.status_code == 404
+
+    def test_publish_get_not_allowed(self, auth_client, db):
+        prop = PropertyFactory()
+        listing = ListingFactory(property=prop, status=ListingStatus.DRAFT)
+        assert auth_client.get(self._url(prop, listing)).status_code == 405
+
+
+class TestListingPrice:
+    def _url(self, prop, listing):
+        return reverse("properties:listing_price", args=[prop.pk, listing.id])
+
+    def test_price_update_success_writes_history(self, auth_client, db):
+        prop = PropertyFactory()
+        listing = ListingFactory(property=prop, price=Decimal("50000.00"))
+        resp = auth_client.post(self._url(prop, listing), {"price": "60000"})
+        assert resp.status_code == 200
+        listing.refresh_from_db()
+        assert listing.price == Decimal("60000.00")
+        assert ListingPriceHistory.objects.filter(
+            listing=listing, price=Decimal("60000.00")
+        ).exists()
+
+    def test_price_update_invalid_keeps_price(self, auth_client, db):
+        prop = PropertyFactory()
+        listing = ListingFactory(property=prop, price=Decimal("50000.00"))
+        resp = auth_client.post(self._url(prop, listing), {"price": "-5"})
+        assert resp.status_code == 200
+        listing.refresh_from_db()
+        assert listing.price == Decimal("50000.00")
+
+    def test_price_get_not_allowed(self, auth_client, db):
+        prop = PropertyFactory()
+        listing = ListingFactory(property=prop)
+        assert auth_client.get(self._url(prop, listing)).status_code == 405

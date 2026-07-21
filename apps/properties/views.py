@@ -6,6 +6,7 @@ from datetime import date
 from django.shortcuts import render, redirect
 from django.http import Http404, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.core.paginator import Paginator
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib import messages
 
 from urllib.parse import urlencode
@@ -33,7 +34,7 @@ from .selectors import (
     )
 from .contexts import BadgeContext, PropertyListContext, MediaItemContext
 from .exceptions import PropertyValidationError
-from .forms import PropertyForm, PropertyCreateForm
+from .forms import PropertyForm, PropertyCreateForm, ListingCreateForm, ListingPriceForm
 from .choices import FeatureCategory, PropertyType
 
 from apps.billing.selectors import (
@@ -60,8 +61,14 @@ from apps.documents.selectors import get_document_list, DocumentFilters
 from apps.documents.context import DocumentContext
 from apps.documents.utils import categorize_document
 
-from apps.listings.selectors import get_listings_for_property
-from apps.listings.services import MIN_PHOTOS_TO_PUBLISH, MIN_DESCRIPTION_LENGTH
+from apps.listings.selectors import get_listings_for_property, get_listing_detail
+from apps.listings.services import (
+    MIN_PHOTOS_TO_PUBLISH, MIN_DESCRIPTION_LENGTH,
+    create_listing, update_listing_status, update_listing_price,
+)
+from apps.listings.exceptions import ListingValidationError, ListingPublicationRequirementsError
+from apps.listings.choices import OperationType, PricePeriod, ListingStatus
+from .checklist import FLOW_EDIT, build_publication_checklist
 
 
 _BADGE_MAP = {
@@ -70,8 +77,15 @@ _BADGE_MAP = {
     PaymentStatus.OVERDUE: BadgeContext(text="En mora",   style="danger"),
 }
 
-
 WIZARD_STEPS = [(1, "Identificación"), (2, "Detalle"), (3, "Fotos")]
+
+# Resolución del gap de period (enmienda S3b): el form de alta expone
+# venta/alquiler; period se deriva de operation_type. Espeja lo que el seed ya
+# asume. temporary_rent no se expone en V1, así que no entra al mapa.
+OPERATION_PERIOD = {
+    OperationType.SALE: PricePeriod.TOTAL,
+    OperationType.RENT: PricePeriod.MONTHLY,
+}
 
 
 def property_new(request):
@@ -465,6 +479,32 @@ def _gate_context(property):
     }
 
 
+def _operacion_section_context(property, flow, listing_form=None):
+    return {
+        "property": property,
+        "listings": list(get_listings_for_property(property.pk)),
+        "listing_form": listing_form if listing_form is not None else ListingCreateForm(),
+        "flow": flow,
+    }
+
+
+def _listing_row_context(listing, flow, price_error=None):
+    return {"listing": listing, "flow": flow, "price_error": price_error}
+
+
+def _modal_response(request, modal_template, extra_context):
+    """Devuelve un modal re-dirigiendo el swap a #modal-container (HX-Retarget).
+    Para acciones cuyo éxito re-renderea inline pero cuyo error/rechazo va al
+    modal — el partial de contenido (checklist / modal_error) viaja como body."""
+    response = render(request, "partials/_modal_shell.html", {
+        "modal_template": modal_template,
+        **extra_context,
+    })
+    response["HX-Retarget"] = "#modal-container"
+    response["HX-Reswap"] = "innerHTML"
+    return response
+
+
 def _media_item_context(media):
     return MediaItemContext(
         id=media.id,
@@ -708,7 +748,7 @@ def property_edit(request, pk):
         form = PropertyForm(instance=property)
 
     selected_slugs, owner_initial = _selected_and_owner(request, property, form)
-    return render(request, "properties/property_edit.html", {
+    context = {
         "property": property,
         "form": form,
         "feature_groups": _feature_groups(),
@@ -717,4 +757,118 @@ def property_edit(request, pk):
         "media_items": [_media_item_context(m) for m in property.media.all()],
         **_gate_context(property),
         "min_description": MIN_DESCRIPTION_LENGTH,
-    })
+        **_operacion_section_context(property, FLOW_EDIT),
+    }
+    return render(request, "properties/property_edit.html", context)
+
+
+def listing_create(request, pk):
+    """
+    Alta de listing (§8-listing, §9). POST-only. El form de la sección Operación
+    postea acá; la respuesta re-renderea la sección entera (lista + form fresco).
+    period se deriva de operation_type. La unicidad (create_listing choca contra
+    un activo del tipo) solo la dispara una carrera → error inline en el form; la
+    sección re-renderizada ya muestra ese activo. flow viaja para que la vertical
+    publicación arme los deep links del checklist.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+
+    flow = request.POST.get("flow", FLOW_EDIT)
+    form = ListingCreateForm(request.POST)
+
+    if form.is_valid():
+        operation_type = form.cleaned_data["operation_type"]
+        try:
+            create_listing(
+                property=property,
+                operation_type=operation_type,
+                price=form.cleaned_data["price"],
+                currency=form.cleaned_data["currency"],
+                period=OPERATION_PERIOD[operation_type],
+                price_min_acceptable=form.cleaned_data["price_min_acceptable"],
+                actor=request.user,
+            )
+        except ListingValidationError as e:
+            form.add_error(None, str(e))
+        else:
+            form = None  # éxito → form fresco en la sección re-renderizada
+
+    return render(
+        request,
+        "properties/partials/_operacion_section.html",
+        _operacion_section_context(property, flow, form),
+    )
+
+
+def listing_publish(request, pk, listing_id):
+    """
+    Publica un listing (§8-listing, §9). POST-only. Éxito → re-renderea la fila
+    (ya PUBLISHED, sin botón publicar). Rechazo del gate → checklist en modal;
+    unicidad → modal_error en modal (ambos vía HX-Retarget). except en orden
+    hija-primero: ListingPublicationRequirementsError antes de ListingValidationError.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        listing = get_listing_detail(listing_id)
+    except ObjectDoesNotExist:
+        raise Http404
+    if listing.property_id != pk:
+        raise Http404
+
+    flow = request.POST.get("flow", FLOW_EDIT)
+    try:
+        update_listing_status(
+            listing=listing, status=ListingStatus.PUBLISHED, actor=request.user,
+        )
+    except ListingPublicationRequirementsError as e:
+        return _modal_response(request, "properties/partials/_publication_checklist.html", {
+            "checklist_items": build_publication_checklist(listing.property, e.missing, flow),
+        })
+    except ListingValidationError as e:
+        return _modal_response(request, "partials/modal_error.html", {"error": str(e)})
+
+    return render(
+        request,
+        "properties/partials/_operacion_listing_row.html",
+        _listing_row_context(listing, flow),
+    )
+
+
+def listing_price(request, pk, listing_id):
+    """
+    Cambia el precio de un listing (§8-listing, §9). POST-only. Éxito y error de
+    validación re-renderean la misma fila (un solo target). El historial lo
+    escribe update_listing_price.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        listing = get_listing_detail(listing_id)
+    except ObjectDoesNotExist:
+        raise Http404
+    if listing.property_id != pk:
+        raise Http404
+
+    flow = request.POST.get("flow", FLOW_EDIT)
+    form = ListingPriceForm(request.POST)
+    if form.is_valid():
+        listing = update_listing_price(
+            listing=listing, price=form.cleaned_data["price"], actor=request.user,
+        )
+        return render(
+            request,
+            "properties/partials/_operacion_listing_row.html",
+            _listing_row_context(listing, flow),
+        )
+
+    return render(
+        request,
+        "properties/partials/_operacion_listing_row.html",
+        _listing_row_context(listing, flow, price_error=form.errors["price"][0]),
+    )

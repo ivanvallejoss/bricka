@@ -1,5 +1,9 @@
+from decimal import Decimal
+
 from django import forms
 
+from apps.common.choices import Currency
+from apps.listings.choices import OperationType
 from .models import Property
 
 
@@ -76,3 +80,38 @@ class PropertyCreateForm(forms.ModelForm):
             "neighborhood",
             "is_external",
         ]
+
+
+class ListingCreateForm(forms.Form):
+    """
+    Alta de listing desde la sección Operación (§8-listing). Form PLANO:
+    create_listing es la puerta (valida unicidad y crea el historial de precio).
+    Este form solo valida tipos. operation_type se restringe a venta/alquiler
+    (temporary_rent no se expone en V1); period NO es campo — la view lo deriva
+    de operation_type (OPERATION_PERIOD). price_min_acceptable es opcional; su
+    invariante (≤ price) es de dominio y su casa es create_listing, no este form.
+    """
+    operation_type = forms.ChoiceField(
+        choices=[
+            (OperationType.SALE.value, OperationType.SALE.label),
+            (OperationType.RENT.value, OperationType.RENT.label),
+        ],
+    )
+    price = forms.DecimalField(
+        max_digits=14, decimal_places=2, min_value=Decimal("0.01"),
+    )
+    currency = forms.ChoiceField(
+        choices=Currency.choices, initial=Currency.ARS,
+    )
+    price_min_acceptable = forms.DecimalField(
+        max_digits=14, decimal_places=2, min_value=Decimal("0.01"),
+        required=False,
+    )
+
+
+class ListingPriceForm(forms.Form):
+    """Cambio de precio de un listing (§8-listing). update_listing_price es la
+    puerta — escribe el historial en la misma transacción."""
+    price = forms.DecimalField(
+        max_digits=14, decimal_places=2, min_value=Decimal("0.01"),
+    )
