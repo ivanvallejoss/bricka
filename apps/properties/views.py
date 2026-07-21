@@ -24,6 +24,7 @@ from .services import (
     reorder_property_media,
     update_property,
     create_property,
+    update_external_source,
 )
 from .selectors import (
     PropertyFilters, 
@@ -34,7 +35,7 @@ from .selectors import (
     )
 from .contexts import BadgeContext, PropertyListContext, MediaItemContext
 from .exceptions import PropertyValidationError
-from .forms import PropertyForm, PropertyCreateForm, ListingCreateForm, ListingPriceForm
+from .forms import PropertyForm, PropertyCreateForm, ListingCreateForm, ListingPriceForm, ExternalSourceForm
 from .choices import FeatureCategory, PropertyType
 
 from apps.billing.selectors import (
@@ -128,10 +129,9 @@ def property_new(request):
 
 def property_new_detalle(request, pk):
     """
-    Fase 2 del wizard (§1): detalle. Reusa el form escalar (§5) — sin bloques
-    externas/location (S3b). Ambos submits guardan (la fase persiste, §1):
-    "Guardar y salir" → detail; "Siguiente" → fotos (W3 lo reapunta; hoy a
-    detail temporal).
+    Fase 2 del wizard (§1): detalle. Reusa el form escalar (§5) + bloque externas
+    si is_external (§6). Location (§4) pendiente. Ambos submits guardan:
+    "Guardar y salir" → detail; "Siguiente" → fotos.
     """
     try:
         property = Property.objects.get(pk=pk)
@@ -158,6 +158,7 @@ def property_new_detalle(request, pk):
         "min_description": MIN_DESCRIPTION_LENGTH,
         "wizard_steps": WIZARD_STEPS,
         "current_step": 2,
+        **_externas_section_context(property),
     })
 
 
@@ -519,6 +520,23 @@ def _operacion_section_context(property, flow, listing_form=None):
     }
 
 
+def _externas_section_context(property, external_form=None, saved=False):
+    if not property.is_external:
+        return {}
+    source = property.external_source
+    if external_form is None:
+        external_form = ExternalSourceForm(initial={
+            "agency_name": source.agency_name,
+            "source_url": source.source_url,
+            "agreed_commission_percent": source.agreed_commission_percent,
+        })
+    return {
+        "property": property,
+        "external_form": external_form,
+        "externas_saved": saved,
+    }
+
+
 def _listing_row_context(listing, flow, price_error=None):
     return {"listing": listing, "flow": flow, "price_error": price_error}
 
@@ -789,6 +807,7 @@ def property_edit(request, pk):
         **_gate_context(property),
         "min_description": MIN_DESCRIPTION_LENGTH,
         **_operacion_section_context(property, FLOW_EDIT),
+        **_externas_section_context(property),
     }
     return render(request, "properties/property_edit.html", context)
 
@@ -833,6 +852,43 @@ def listing_create(request, pk):
         request,
         "properties/partials/_operacion_section.html",
         _operacion_section_context(property, flow, form),
+    )
+
+
+def external_source_update(request, pk):
+    """
+    Corrige la fuente externa de una propiedad (§6, §10.5). POST-only. El bloque
+    solo existe si is_external, así que un POST a una no-externa es 404 (el
+    recurso no existe, no es error de negocio). agency_name requerido lo valida
+    el form; el service es el backstop de dominio. Éxito → re-renderea el bloque
+    con los valores actualizados y "Guardado".
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        property = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+    if not property.is_external:
+        raise Http404
+
+    form = ExternalSourceForm(request.POST)
+    saved = False
+    if form.is_valid():
+        update_external_source(
+            property=property,
+            agency_name=form.cleaned_data["agency_name"],
+            source_url=form.cleaned_data["source_url"],
+            agreed_commission_percent=form.cleaned_data["agreed_commission_percent"],
+            actor=request.user,
+        )
+        form = None
+        saved = True
+
+    return render(
+        request,
+        "properties/partials/_externas_section.html",
+        _externas_section_context(property, form, saved),
     )
 
 

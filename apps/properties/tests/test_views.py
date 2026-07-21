@@ -18,7 +18,7 @@ from apps.listings.models import Listing, ListingPriceHistory
 from apps.listings.choices import ListingStatus, OperationType, PricePeriod
 
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
-from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory
+from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory, ExternalPropertySourceFactory
 from apps.properties.models import PropertyMedia, Feature, Property
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
 from apps.properties.views import _operacion_section_context
@@ -666,3 +666,63 @@ class TestPropertyNewOperacion:
         import uuid
         resp = auth_client.get(reverse("properties:new_operacion", args=[uuid.uuid4()]))
         assert resp.status_code == 404
+
+
+class TestExternalSourceUpdate:
+    def _url(self, source):
+        return reverse("properties:external_source_update", args=[source.property.pk])
+
+    def test_updates_source(self, auth_client, db):
+        source = ExternalPropertySourceFactory(agency_name="Vieja")
+        resp = auth_client.post(self._url(source), {
+            "agency_name": "Nueva Inmobiliaria",
+            "source_url": "https://nueva.example.com",
+            "agreed_commission_percent": "4.50",
+        })
+        assert resp.status_code == 200
+        source.refresh_from_db()
+        assert source.agency_name == "Nueva Inmobiliaria"
+        assert source.source_url == "https://nueva.example.com"
+        assert source.agreed_commission_percent == Decimal("4.50")
+
+    def test_blank_agency_rejected(self, auth_client, db):
+        source = ExternalPropertySourceFactory(agency_name="Norte")
+        resp = auth_client.post(self._url(source), {
+            "agency_name": "", "source_url": "", "agreed_commission_percent": "",
+        })
+        assert resp.status_code == 200
+        source.refresh_from_db()
+        assert source.agency_name == "Norte"
+
+    def test_blanks_source_url(self, auth_client, db):
+        source = ExternalPropertySourceFactory(source_url="https://old.example.com")
+        resp = auth_client.post(self._url(source), {
+            "agency_name": source.agency_name, "source_url": "", "agreed_commission_percent": "",
+        })
+        assert resp.status_code == 200
+        source.refresh_from_db()
+        assert source.source_url == ""
+
+    def test_non_external_404(self, auth_client, db):
+        prop = PropertyFactory()  # is_external=False
+        resp = auth_client.post(
+            reverse("properties:external_source_update", args=[prop.pk]),
+            {"agency_name": "X"},
+        )
+        assert resp.status_code == 404
+
+    def test_get_not_allowed(self, auth_client, db):
+        source = ExternalPropertySourceFactory()
+        assert auth_client.get(self._url(source)).status_code == 405
+
+
+class TestExternasBlockRender:
+    def test_edit_shows_block_when_external(self, auth_client, db):
+        source = ExternalPropertySourceFactory()
+        resp = auth_client.get(reverse("properties:edit", args=[source.property.pk]))
+        assert 'id="externas-section"' in resp.content.decode()
+
+    def test_edit_hides_block_when_not_external(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.get(reverse("properties:edit", args=[prop.pk]))
+        assert 'id="externas-section"' not in resp.content.decode()

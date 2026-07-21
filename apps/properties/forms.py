@@ -115,3 +115,17 @@ class ListingPriceForm(forms.Form):
     price = forms.DecimalField(
         max_digits=14, decimal_places=2, min_value=Decimal("0.01"),
     )
+
+
+class ExternalSourceForm(forms.Form):
+    """
+    Corrección de la fuente externa (§6). Espeja el modelo: agency_name requerido
+    (no se blanquea — regla de update_external_source); source_url y comisión
+    opcionales (vacío → blanquea vía el service). El form manda los tres siempre;
+    el service traduce "" / None a blanqueo.
+    """
+    agency_name = forms.CharField(max_length=200)
+    source_url = forms.URLField(required=False, assume_scheme="https")
+    agreed_commission_percent = forms.DecimalField(
+        max_digits=5, decimal_places=2, required=False,
+    )
