@@ -14,13 +14,19 @@
 <div class="max-w-3xl space-y-6">
 
     {# ── Datos de la propiedad (form escalar §2) ── #}
-    {% include "properties/partials/_property_form.html" %}
+    <div id="detalle" class="scroll-mt-24">
+        {% include "properties/partials/_property_form.html" %}
+    </div>
 
-    {# Huecos S3b — secciones de acción inmediata, cada una su partial+endpoint: #}
-    {# operación (§8-listing), fuente externa (§6), location (§4).               #}
+    {# ── Operación (§8-listing) ── #}
+    {% include "properties/partials/_operacion_section.html" %}
+
+    {# Huecos S3b restantes: fuente externa (§6), location (§4). #}           
 
     {# ── Fotos ── #}
-    {% include "properties/partials/_media_section.html" %}
+    <div id="fotos" class="scroll-mt-24">
+        {% include "properties/partials/_media_section.html" %}
+    </div>
 
 </div>
 {% endblock %}

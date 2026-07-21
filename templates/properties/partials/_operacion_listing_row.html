@@ -1,0 +1,75 @@
+{% comment %}
+Fila de un listing en la sección Operación. id="listing-{id}" — swap puntual
+(outerHTML) tras publicar / cambiar precio. Contexto: listing, flow, price_error.
+El editor de precio va detrás de un toggle (two-step de confirming): la fila
+muestra el precio; "Actualizar precio" revela input+guardar. En error de
+validación el editor arranca abierto para mostrar el mensaje. Publicar solo en
+DRAFT/PAUSED. Ambos forms cargan flow para preservarlo al re-renderear la fila.
+{% endcomment %}
+<div id="listing-{{ listing.id }}"
+     x-data="{ editingPrice: {% if price_error %}true{% else %}false{% endif %} }"
+     class="p-3 rounded-md bg-surface-container-low border border-outline">
+    <div class="flex items-center justify-between gap-3">
+        <div>
+            <p class="text-sm font-medium text-on-surface">{{ listing.get_operation_type_display }}</p>
+            <p class="text-xs text-on-surface-variant mt-0.5 tabular-nums">
+                ${{ listing.price|floatformat:0 }} {{ listing.currency }}
+            </p>
+        </div>
+        {% if listing.status == 'published' %}
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">
+                Publicado
+            </span>
+        {% else %}
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-container text-on-surface-variant">
+                {{ listing.get_status_display }}
+            </span>
+        {% endif %}
+    </div>
+
+    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-outline">
+        <button type="button" x-show="!editingPrice" @click="editingPrice = true"
+                class="px-2.5 py-1 text-xs font-medium text-on-surface-variant border border-outline rounded
+                       hover:bg-surface-container transition-colors">
+            Actualizar precio
+        </button>
+
+        <form x-show="editingPrice" x-cloak
+              hx-post="{% url 'properties:listing_price' listing.property_id listing.id %}"
+              hx-target="#listing-{{ listing.id }}" hx-swap="outerHTML"
+              class="flex items-center gap-1.5">
+            <input type="hidden" name="flow" value="{{ flow }}">
+            <input type="number" step="0.01" min="0.01" name="price" value="{{ listing.price }}"
+                   class="w-28 px-2 py-1 text-sm bg-surface border rounded tabular-nums
+                          focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                          focus:border-primary-container transition-colors
+                          {% if price_error %}border-danger-text{% else %}border-outline{% endif %}">
+            <button type="submit"
+                    class="px-2.5 py-1 text-xs font-medium bg-primary-container text-on-primary rounded
+                           hover:bg-primary transition-colors">
+                Guardar
+            </button>
+            <button type="button" @click="editingPrice = false"
+                    class="px-2 py-1 text-xs text-on-surface-variant hover:text-on-surface transition-colors">
+                Cancelar
+            </button>
+        </form>
+
+        {% if listing.status == 'draft' or listing.status == 'paused' %}
+        <form hx-post="{% url 'properties:listing_publish' listing.property_id listing.id %}"
+              hx-target="#listing-{{ listing.id }}" hx-swap="outerHTML"
+              class="ml-auto">
+            <input type="hidden" name="flow" value="{{ flow }}">
+            <button type="submit"
+                    class="px-3 py-1 text-xs font-medium bg-primary-container text-on-primary rounded
+                           hover:bg-primary transition-colors">
+                Publicar
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if price_error %}
+    <p x-show="editingPrice" class="text-xs text-danger-text mt-1.5">{{ price_error }}</p>
+    {% endif %}
+</div>

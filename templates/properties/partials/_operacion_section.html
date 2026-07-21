@@ -1,0 +1,115 @@
+{% comment %}
+Sección "Operación" (§8-listing). Partial COMPARTIDO entre la edición y la
+fase 4 del wizard. Lista los listings + form de alta (→ create_listing, DRAFT).
+Contexto: property, listings, listing_form, flow. Swap: la sección entera
+(outerHTML) tras crear. Los controles por listing (publicar/precio) los agrega
+la vertical publicación.
+{% endcomment %}
+<section id="operacion-section" class="bg-surface border border-outline rounded-md p-5">
+    <p class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant mb-3">
+        Operación
+    </p>
+
+    {% if listings %}
+    <div class="space-y-2 mb-5">
+        {% for listing in listings %}
+            {% include "properties/partials/_operacion_listing_row.html" %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-on-surface-variant mb-5">Sin operaciones todavía.</p>
+    {% endif %}
+
+    <form hx-post="{% url 'properties:listing_create' property.pk %}"
+          hx-target="#operacion-section"
+          hx-swap="outerHTML"
+          class="border-t border-outline pt-4 flex flex-col gap-3">
+        <input type="hidden" name="flow" value="{{ flow }}">
+
+        {% if listing_form.non_field_errors %}
+        <div class="p-3 rounded-md bg-danger-bg border border-danger-text/20">
+            {% for error in listing_form.non_field_errors %}
+            <p class="text-sm text-danger-text">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Operación
+                </label>
+                <select name="operation_type"
+                        class="w-full px-3 py-2 text-sm bg-surface border rounded cursor-pointer
+                               focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                               focus:border-primary-container transition-colors
+                               {% if listing_form.operation_type.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                    {% for value, label in listing_form.operation_type.field.choices %}
+                    <option value="{{ value }}"
+                            {% if listing_form.operation_type.value == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if listing_form.operation_type.errors %}
+                <p class="text-xs text-danger-text">{{ listing_form.operation_type.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Moneda
+                </label>
+                <select name="currency"
+                        class="w-full px-3 py-2 text-sm bg-surface border border-outline rounded cursor-pointer
+                               focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                               focus:border-primary-container transition-colors">
+                    {% for value, label in listing_form.currency.field.choices %}
+                    <option value="{{ value }}"
+                            {% if listing_form.currency.value == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Precio
+                </label>
+                <input type="number" step="0.01" min="0.01" name="price"
+                       value="{{ listing_form.price.value|default:'' }}"
+                       class="w-full px-3 py-2 text-sm bg-surface border rounded tabular-nums
+                              focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                              focus:border-primary-container transition-colors
+                              {% if listing_form.price.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                {% if listing_form.price.errors %}
+                <p class="text-xs text-danger-text">{{ listing_form.price.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[11px] font-medium uppercase tracking-[0.07em] text-on-surface-variant">
+                    Mínimo aceptable <span class="normal-case text-on-surface-variant/60">(opcional)</span>
+                </label>
+                <input type="number" step="0.01" min="0.01" name="price_min_acceptable"
+                       value="{{ listing_form.price_min_acceptable.value|default:'' }}"
+                       class="w-full px-3 py-2 text-sm bg-surface border rounded tabular-nums
+                              focus:outline-none focus:ring-2 focus:ring-primary-container/20
+                              focus:border-primary-container transition-colors
+                              {% if listing_form.price_min_acceptable.errors %}border-danger-text{% else %}border-outline{% endif %}">
+                {% if listing_form.price_min_acceptable.errors %}
+                <p class="text-xs text-danger-text">{{ listing_form.price_min_acceptable.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit"
+                    class="px-4 py-2 rounded bg-primary-container text-on-primary text-sm font-medium
+                           hover:bg-primary transition-colors">
+                Agregar operación
+            </button>
+        </div>
+    </form>
+</section>

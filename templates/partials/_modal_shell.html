@@ -1,0 +1,38 @@
+{% comment %}
+Shell de modal genérico. Se carga en #modal-container (innerHTML), típicamente
+vía HX-Retarget desde una acción cuyo éxito re-renderea inline pero cuyo
+error/rechazo va al modal. Alpine abre al montar y auto-limpia el container al
+cerrar (patrón de contact_form_modal). Envuelve un body arbitrario: la view pasa
+`modal_template` (path del contenido) + su contexto.
+{% endcomment %}
+<div x-data="{ open: false }"
+     x-init="$nextTick(() => { open = true });
+             $watch('open', v => { if (!v) setTimeout(() => {
+                 document.getElementById('modal-container').innerHTML = '' }, 200) });"
+     @keydown.escape.window="open = false"
+     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     :class="{ 'pointer-events-none': !open }">
+
+    <div x-show="open"
+         x-transition:enter="transition-opacity ease-out duration-200"
+         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-in duration-200"
+         x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         @click="open = false" style="pointer-events: auto;"
+         class="absolute inset-0 bg-primary/30"></div>
+
+    <div x-show="open"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+         style="pointer-events: auto;"
+         class="relative w-full max-w-md bg-surface rounded-lg shadow-xl border border-outline p-4">
+        <button type="button" @click="open = false"
+                class="absolute top-2.5 right-2.5 z-10 p-1.5 rounded text-on-surface-variant
+                       hover:text-on-surface hover:bg-surface-container transition-colors">
+            {% include "icons/x.html" with size="16" %}
+        </button>
+        {% include modal_template %}
+    </div>
+</div>

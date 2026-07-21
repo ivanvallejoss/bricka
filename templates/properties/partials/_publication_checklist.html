@@ -1,0 +1,26 @@
+{% comment %}
+Checklist navegable del gate de publicación (§1). Partial COMPARTIDO: se
+renderiza para todo rechazo de ListingPublicationRequirementsError, sin asumir
+el flujo que lo invoca. Recibe `checklist_items` (lista de
+PublicationChecklistItem ya resuelta en la view). Es contenido puro, drop-in
+donde iría partials/modal_error.html — el mecanismo de swap lo cablea el caller.
+{% endcomment %}
+<div class="p-4 rounded-md bg-danger-bg border border-danger-text/20 flex flex-col gap-3">
+    <p class="text-sm font-semibold text-danger-text">No se puede publicar todavía</p>
+    <ul class="flex flex-col gap-2">
+        {% for item in checklist_items %}
+        <li class="flex items-center justify-between gap-4 text-sm">
+            <span class="flex items-baseline gap-2 text-on-surface">
+                <span aria-hidden="true" class="text-danger-text font-semibold">✗</span>
+                <span><span class="font-medium">{{ item.label }}:</span> {{ item.detail }}</span>
+            </span>
+            {% if item.link_url %}
+            <a href="{{ item.link_url }}"
+               class="shrink-0 whitespace-nowrap font-medium text-primary-container hover:underline">
+                {{ item.link_text }} →
+            </a>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
