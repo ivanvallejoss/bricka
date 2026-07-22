@@ -51,6 +51,12 @@ por la puerta de dominio, no por SQL. Evidencia de problema real.
 - Defensivo: guard cegado al revés + caplog → CRITICAL + error genérico.
 - Reemplazados: los dos tests active/paused de create (subsumidos por la
   parametrización) y el de publish-con-activo (escenario imposible).
+- Test de views de publish reescrito: el escenario de unicidad real es
+  inalcanzable → el test inyecta ListingValidationError en la frontera
+  view↔service (patch donde se usa) y verifica SOLO el ruteo
+  (modal_error + HX-Retarget + no-efecto sobre el listing). Criterio:
+  el contrato de la view es "muestra str(e)", se assertea con centinela,
+  no con redacción real del service.
 
 ## Observaciones capturadas — destino: ventana de planificación
 
@@ -81,6 +87,14 @@ Sin versión asignada; la partición V1/V1.1/V2 la decide planificación.
    cascadas / futuro soft-delete de propiedad: ¿la fila borrada limpia
    el objeto en R2 o queda huérfano? Definir UNA política para todos
    los caminos de borrado. Toca la #4.
+   Confirmado en esta ventana: el reset usa TRUNCATE CASCADE (SQL puro,
+   sin pasar por el ORM) → ningún camino de borrado actual limpia R2;
+   todo objeto subido queda huérfano al borrar su fila. La ventana que
+   tome esto define UNA política (borrado explícito del objeto vs.
+   limpieza de huérfanos batch) para: reset del seed, cascadas, y el
+   futuro soft-delete de propiedad (#4). Insumo pendiente de esa
+   ventana: revisar el upload_to de PropertyMedia — si el path tiene
+   prefijo predecible, la limpieza de huérfanos es un list+diff barato.
 
 ## Deuda nueva
 
