@@ -19,6 +19,7 @@ from apps.contacts.tests.factories import ContactFactory
 from apps.listings.tests.factories import ListingFactory
 from apps.listings.models import Listing, ListingPriceHistory
 from apps.listings.choices import ListingStatus, OperationType, PricePeriod
+from apps.listings.exceptions import ListingValidationError
 
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
 from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory, ExternalPropertySourceFactory
@@ -547,18 +548,27 @@ class TestListingPublish:
         listing.refresh_from_db()
         assert listing.status == ListingStatus.DRAFT
 
-    def test_publish_unicidad_returns_modal_error(self, auth_client, db):
+    def test_publish_validation_error_returns_modal_error(self, auth_client, db):
+        """El branching de la view: ListingValidationError → modal_error.
+        El escenario de unicidad real es inalcanzable desde la extensión
+        de la constraint (la rama del service es defensiva); se inyecta
+        el error en la frontera para testear SOLO el ruteo de la view."""
+        
         prop = PropertyFactory()
-        ListingFactory(property=prop, operation_type=OperationType.SALE,
-                       status=ListingStatus.PUBLISHED)
-        draft = ListingFactory(property=prop, operation_type=OperationType.SALE,
-                               status=ListingStatus.DRAFT)
-        resp = auth_client.post(self._url(prop, draft), {"flow": "edit"})
-        assert resp.status_code == 200
-        assert resp.get("HX-Retarget") == "#modal-container"
-        assert "Ya existe un listing activo" in resp.content.decode()
-        draft.refresh_from_db()
-        assert draft.status == ListingStatus.DRAFT
+        listing = ListingFactory(property=prop, operation_type=OperationType.SALE,
+                status=ListingStatus.PUBLISHED)
+        
+        with patch(
+            "apps.properties.views.update_listing_status",
+            side_effect=ListingValidationError("boom"),
+        ):
+            resp = auth_client.post(self._url(prop, listing), {"flow": "edit"})
+            assert resp.status_code == 200
+            assert resp.get("HX-Retarget") == "#modal-container"
+            assert "boom" in resp.content.decode()
+
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.PUBLISHED
 
     def test_publish_wrong_property_404(self, auth_client, db):
         prop_a = PropertyFactory()
