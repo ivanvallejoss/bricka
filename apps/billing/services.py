@@ -6,6 +6,7 @@ from django.db import transaction, IntegrityError
 from django.contrib.auth import get_user_model
 
 from apps.common.choices import Currency
+from apps.common.utils import violates_constraint
 
 from .choices import ConceptLineType, DocumentStatus, DocumentType
 from .concept import ConceptLine
@@ -260,7 +261,7 @@ def create_billing_document(
             document.save()
     except IntegrityError as exc:
         constraint_name = _PERIODIC_CONSTRAINT_BY_TYPE.get(document_type)
-        if constraint_name and _violates_constraint(exc, constraint_name):
+        if constraint_name and violates_constraint(exc, constraint_name):
             raise DuplicatePeriodicReceipt(
                 f"Ya existe un {DocumentType(document_type).label.lower()} "
                 f"emitido para este período (detectado al confirmar en DB — "
@@ -269,15 +270,6 @@ def create_billing_document(
         raise
 
     return document
-
-
-def _violates_constraint(exc: IntegrityError, constraint_name: str) -> bool:
-    """Identifica si el IntegrityError fue disparado por un constraint
-    específico, vía el diagnóstico de Postgres — NO parseando el mensaje
-    de error como string. psycopg2/psycopg exponen .diag.constraint_name
-    en la excepción subyacente que Django envuelve como __cause__."""
-    diag = getattr(exc.__cause__, "diag", None)
-    return getattr(diag, "constraint_name", None) == constraint_name
 
 
 def _line_sign(document_type: str, line_type: str) -> Decimal:

@@ -27,8 +27,10 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-# Listings "vivos en superficie propia": retienen el slot del constraint
-# unique_active_listing_per_operation. Son los que se cierran al vender/alquilar.
+# Listings "vivos en superficie propia": los que se pausan/cierran al
+# operar sobre la propiedad. (Nota: desde la extensión de
+# unique_active_listing_per_operation, el slot del constraint lo retiene
+# todo no-cerrado — este par es el subconjunto *visible*, no el slot.)
 _ACTIVE_LISTING_STATUSES = [ListingStatus.PUBLISHED, ListingStatus.PAUSED]
 
 # operation_types de alquiler. RENTED cierra solo estos; el de venta sigue vivo.

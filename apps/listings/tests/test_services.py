@@ -1,6 +1,10 @@
-from decimal import Decimal
-
 import pytest
+import logging
+
+from decimal import Decimal
+from unittest.mock import patch
+
+from django.db import IntegrityError, transaction
 
 from apps.listings.choices import (
     ListingStatus,
@@ -20,6 +24,9 @@ from apps.listings.services import (
 )
 from apps.listings.tests.factories import ListingFactory, ListingPublicationFactory
 from apps.properties.tests.factories import PropertyFactory
+
+
+logger = logging.getLogger(__name__)
 
 
 class TestCreateListing:
@@ -47,39 +54,46 @@ class TestCreateListing:
         )
         assert ListingPriceHistory.objects.filter(listing=listing).count() == 1
 
-    def test_raises_if_active_listing_exists_for_same_operation(self, db, actor):
-        prop = PropertyFactory()
-        ListingFactory(
-            property=prop,
+    @pytest.mark.parametrize("blocking_status", [
+        ListingStatus.DRAFT,
+        ListingStatus.PENDING_APPROVAL,
+        ListingStatus.PUBLISHED,
+        ListingStatus.PAUSED,
+    ])
+    def test_raises_if_non_closed_listing_exists_for_same_operation(
+        self, db, actor, blocking_status
+    ):
+        existing = ListingFactory(
             operation_type=OperationType.SALE,
-            status=ListingStatus.PUBLISHED,
+            status=blocking_status,
         )
         with pytest.raises(ListingValidationError):
             create_listing(
-                property=prop,
+                property=existing.property,
                 operation_type=OperationType.SALE,
-                price=Decimal("5000000.00"),
+                price=Decimal("100000.00"),
                 currency="ARS",
                 period="total",
                 actor=actor,
             )
 
-    def test_raises_if_paused_listing_exists_for_same_operation(self, db, actor):
-        prop = PropertyFactory()
-        ListingFactory(
-            property=prop,
-            operation_type=OperationType.RENT,
-            status=ListingStatus.PAUSED,
+    def test_error_message_names_the_blocking_status(self, db, actor):
+        """El mensaje es contrato con el socio: tiene que decir QUÉ estado
+        bloquea (un borrador pide otra acción que algo publicado)."""
+        existing = ListingFactory(
+            operation_type=OperationType.SALE,
+            status=ListingStatus.DRAFT,
         )
-        with pytest.raises(ListingValidationError):
+        with pytest.raises(ListingValidationError) as excinfo:
             create_listing(
-                property=prop,
-                operation_type=OperationType.RENT,
-                price=Decimal("50000.00"),
+                property=existing.property,
+                operation_type=OperationType.SALE,
+                price=Decimal("100000.00"),
                 currency="ARS",
-                period="monthly",
+                period="total",
                 actor=actor,
             )
+        assert "Borrador" in str(excinfo.value)
 
     def test_allows_different_operation_types_on_same_property(self, db, actor):
         prop = PropertyFactory()
@@ -142,24 +156,31 @@ class TestUpdateListingStatus:
         listing.refresh_from_db()
         assert listing.status == ListingStatus.PUBLISHED
 
-    def test_raises_when_activating_with_existing_active_listing(self, db, actor):
-        prop = PropertyFactory()
-        ListingFactory(
-            property=prop,
-            operation_type=OperationType.RENT,
-            status=ListingStatus.PUBLISHED,
-        )
-        new_listing = ListingFactory(
-            property=prop,
-            operation_type=OperationType.RENT,
-            status=ListingStatus.DRAFT,
-        )
-        with pytest.raises(ListingValidationError):
-            update_listing_status(
-                listing=new_listing,
-                status=ListingStatus.PUBLISHED,
-                actor=actor,
-            )
+    def test_defensive_branch_logs_critical_on_impossible_duplicate(
+        self, db, actor, caplog
+    ):
+        """La rama es inalcanzable por construcción (constraint del paso 1).
+        Se fuerza cegando el guard al revés — exists() devuelve True — y se
+        assertean sus dos salidas: log CRITICAL para el operador, error
+        genérico para el usuario. Si alguien borra la rama 'porque nunca
+        pasa', este test lo frena."""
+        listing = ListingFactory(status=ListingStatus.DRAFT)
+        with patch("apps.listings.services.Listing.objects.filter") as mock_filter:
+            (
+                mock_filter.return_value
+                .exclude.return_value
+                .exclude.return_value
+                .exists.return_value
+            ) = True
+            with caplog.at_level(logging.CRITICAL, logger="apps.listings.services"):
+                with pytest.raises(ListingValidationError) as excinfo:
+                    update_listing_status(
+                        listing=listing,
+                        status=ListingStatus.PUBLISHED,
+                        actor=actor,
+                    )
+        assert "Invariante de unicidad vulnerado" in caplog.text
+        assert "Error interno" in str(excinfo.value)
 
     def test_allows_activation_when_existing_listing_is_closed(self, db, actor):
         prop = PropertyFactory(publishable=True)
@@ -342,3 +363,43 @@ class TestPublicationGate:
         listing = ListingFactory(status=ListingStatus.DRAFT)
         with pytest.raises(ListingValidationError):
             update_listing_status(listing=listing, status=ListingStatus.PUBLISHED, actor=actor)
+
+
+class TestListingUnicityRaceCondition:
+    def test_partial_constraint_is_the_real_backstop(self, db):
+        """El guard del service es un SELECT previo — no cierra la carrera
+        entre dos requests concurrentes. La constraint parcial sí. Este
+        test la ejercita directo en DB, bypaseando el service.
+        """
+        existing = ListingFactory(
+            operation_type=OperationType.SALE,
+            status=ListingStatus.DRAFT,
+        )
+        with pytest.raises(IntegrityError):
+            with transaction.atomic():
+                ListingFactory(
+                    property=existing.property,
+                    operation_type=OperationType.SALE,
+                    status=ListingStatus.DRAFT,
+                )
+
+    def test_integrity_error_translated_to_business_exception(self, db, actor):
+        """Guard cegado (simula la carrera: el otro listing se creó entre
+        el chequeo y el save) → la DB rechaza → el usuario recibe el
+        error de negocio, no el IntegrityError crudo."""
+        existing = ListingFactory(
+            operation_type=OperationType.SALE,
+            status=ListingStatus.DRAFT,
+        )
+        with patch("apps.listings.services.Listing.objects.filter") as mock_filter:
+            mock_filter.return_value.exclude.return_value.first.return_value = None
+            with pytest.raises(ListingValidationError) as excinfo:
+                create_listing(
+                    property=existing.property,
+                    operation_type=OperationType.SALE,
+                    price=Decimal("100000.00"),
+                    currency="ARS",
+                    period="total",
+                    actor=actor,
+                )
+        assert "simultáneas" in str(excinfo.value)
