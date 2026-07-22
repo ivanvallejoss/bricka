@@ -1069,3 +1069,30 @@ El cierre del listing de venta NO es efecto de la transición: es efecto deal→
 **La ocupación (RENTED) tiene precedencia sobre el evento de venta.** close_deal WON+SALE → settle_won_sale: cierra el listing de venta siempre; transiciona a SOLD solo si la propiedad estaba AVAILABLE. Una unidad alquilada que se vende sigue RENTED — el estado durativo no se pisa; el 'está vendida' se responde por el deal ganado + owner nuevo. Consecuencia: SOLD queda solo para vendidas-y-vacías, lo que hace limpio el guard de salida de SOLD.
 
 **Guard de SOLD (implementado).** `transition_property_status` rechaza toda transición saliente de una propiedad SOLD con InvalidPropertyTransition. La única salida sancionada es remandate_property, que entra por el motor interno `_apply_property_transition` (sin guard). Patrón: función pública guardada / motor sin guard / la salida legítima entra por el motor. Como con precedencia SOLD queda solo para vendidas-y-vacías, el guard no tiene falsos positivos: no hay caminos incidentales legítimos que salgan de SOLD.
+
+### Enmienda (jul 2026): condición extendida a estados no-cerrados
+
+La condición original (`status IN (published, paused)`) resultó corta:
+protegía la superficie visible pero permitía duplicados en draft y
+pending_approval — el estado inválido era construible por doble-click,
+concurrencia, POST directo o cualquier caller no-UI. La verificación
+pre-migración lo confirmó empíricamente: la DB de dev contenía dos
+drafts SALE duplicados creados durante pruebas manuales pre-S3b.
+
+Condición nueva: `NOT closed AND deleted_at IS NULL`. Se escribe por
+EXCLUSIÓN y no por lista, a propósito: un estado futuro agregado al enum
+queda DENTRO de la constraint por defecto (sobre-bloqueo visible) en vez
+de fuera (leak silencioso). `closed` es el único estado que libera el
+slot; el soft-delete (`archive_listing`) es la otra vía de liberación.
+
+El invariante queda en tres capas con funciones distintas:
+
+1. Constraint parcial (DB) — la garantía; ningún caller la saltea.
+2. Chequeo en create_listing — la experiencia; error temprano y legible
+   que nombra el estado bloqueante.
+3. Catch de IntegrityError (helper común violates_constraint) — el
+   puente; traduce la carrera que el chequeo no ve al error de negocio.
+
+Consecuencia: la unicidad-en-publish de update_listing_status pasó a
+rama DEFENSIVA (inalcanzable por construcción) — log CRITICAL + error
+genérico. Si se dispara, la constraint fue vulnerada.
