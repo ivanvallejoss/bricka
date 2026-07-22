@@ -65,9 +65,9 @@ class Listing(SoftDeleteModel, AuditableMixin):
         constraints = [
             models.UniqueConstraint(
                 fields=["property", "operation_type"],
-                condition=models.Q(
-                    status__in=["published", "paused"],
-                    deleted_at__isnull=True,
+                condition=(
+                    ~models.Q(status="closed")
+                    & models.Q(deleted_at__isnull=True)
                 ),
                 name="unique_active_listing_per_operation",
             )
