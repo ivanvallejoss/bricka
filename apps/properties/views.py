@@ -46,6 +46,7 @@ from .forms import (
     LocationForm,
     )
 from .choices import FeatureCategory, PropertyType
+from .checklist import FLOW_EDIT, FLOW_WIZARD, build_publication_checklist
 
 from apps.billing.selectors import (
     get_rental_payment_status, 
@@ -79,7 +80,9 @@ from apps.listings.services import (
 )
 from apps.listings.exceptions import ListingValidationError, ListingPublicationRequirementsError
 from apps.listings.choices import OperationType, PricePeriod, ListingStatus
-from .checklist import FLOW_EDIT, FLOW_WIZARD, build_publication_checklist
+
+from apps.operations.services import withdraw_property, restore_property
+from apps.operations.exceptions import InvalidPropertyTransition
 
 
 _BADGE_MAP = {
@@ -363,11 +366,14 @@ def slide_over_documents(request, pk):
     })
 
 
-def property_detail(request, pk):
-    try:
-        prop = get_property_detail(pk)
-    except Property.DoesNotExist:
-        raise Http404
+def _property_detail_context(pk):
+    """
+    Contexto completo del detail. Lo comparten property_detail (GET) y
+    property_restore (render directo en rechazo del gate). Lanza
+    Property.DoesNotExist — el caller decide el 404.
+    Convención S3b: devuelve TODO lo que property_detail.html referencia.
+    """
+    prop = get_property_detail(pk)
 
     active_contract = get_active_contract_for_property(pk)
     payment_status = None
@@ -379,7 +385,7 @@ def property_detail(request, pk):
         payment_status = statuses.get(active_contract.id)
         invoice_count = get_billing_document_count_for_contract(active_contract.id)
         recent_documents = list(get_recent_documents_for_contract(active_contract.id, limit=6))
-    
+
     document_count = get_document_list(DocumentFilters(property_id=pk)).count()
 
     media_list = list(prop.media.all())  # ya viene prefetched ordenado
@@ -391,7 +397,7 @@ def property_detail(request, pk):
     gallery_urls = [get_public_media_url(m.r2_key) for m in media_list]
     listings = list(get_listings_for_property(pk))
 
-    return render(request, "properties/property_detail.html", {
+    return {
         "property": prop,
         "active_contract": active_contract,
         "payment_status": payment_status,
@@ -402,7 +408,65 @@ def property_detail(request, pk):
         "gallery_urls": gallery_urls,
         "gallery_urls_json": json.dumps(gallery_urls),
         "listings": listings,
-    })
+    }
+
+
+def property_detail(request, pk):
+    try:
+        context = _property_detail_context(pk)
+    except Property.DoesNotExist:
+        raise Http404
+    return render(request, "properties/property_detail.html", context)
+
+
+def property_withdraw(request, pk):
+    """
+    Retira la propiedad del mercado (§8): AVAILABLE → UNAVAILABLE vía el
+    orquestador (withdraw_property pausa los listings publicados — retienen
+    slot, salen de la landing). Form nativo POST + redirect (convención de
+    destructivas: el sidebar renderiza dos veces). InvalidPropertyTransition
+    solo es alcanzable por página vieja o carrera (el botón no existe en
+    estados inválidos) → messages.error + redirect, no modal (enmienda S4).
+"""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        prop = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+    try:
+        withdraw_property(property=prop, actor=request.user)
+    except InvalidPropertyTransition as e:
+        messages.error(request, str(e))
+    return redirect("properties:detail", pk=pk)
+
+
+def property_restore(request, pk):
+    """
+    Reactiva la propiedad (§8): UNAVAILABLE → AVAILABLE. restore_property
+    despausa vía update_listing_status(PUBLISHED) → el gate corre adentro;
+    su rechazo propaga y el atomic del orquestador revierte TODO (A1).
+    Rechazo → render directo del detail con el checklist compartido
+    (flow=edit), releyendo estado post-rollback desde DB. Sin modal:
+    transporte nativo (enmienda S4).
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        prop = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        raise Http404
+    try:
+        restore_property(property=prop, actor=request.user)
+    except InvalidPropertyTransition as e:
+        messages.error(request, str(e))
+    except ListingPublicationRequirementsError as e:
+        context = _property_detail_context(pk)
+        context["checklist_items"] = build_publication_checklist(
+            context["property"], e.missing, FLOW_EDIT
+        )
+        return render(request, "properties/property_detail.html", context)
+    return redirect("properties:detail", pk=pk)
 
 
 def detail_publication(request, pk):

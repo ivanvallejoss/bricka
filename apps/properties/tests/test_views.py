@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from django.urls import reverse
 from django.core.cache import cache
+from django.contrib import messages as django_messages
 from django.contrib.gis.geos import Point
 
 from botocore.exceptions import ClientError
@@ -22,6 +23,7 @@ from apps.listings.choices import ListingStatus, OperationType, PricePeriod
 from apps.listings.exceptions import ListingValidationError
 
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
+from apps.properties.choices import PropertyStatus
 from apps.properties.tests.factories import PropertyFactory, PropertyMediaFactory, ExternalPropertySourceFactory
 from apps.properties.models import PropertyMedia, Feature, Property
 from apps.properties.services import MAX_PHOTOS_PER_PROPERTY
@@ -847,3 +849,64 @@ class TestLocationSectionContext:
         prop = PropertyFactory()
         resp = auth_client.get(reverse("properties:edit", args=[prop.pk]))
         assert 'id="location-map"' in resp.content.decode()
+
+
+class TestPropertyWithdrawRestore:
+    def _withdraw(self, client, prop):
+        return client.post(reverse("properties:withdraw", kwargs={"pk": prop.pk}))
+
+    def _restore(self, client, prop):
+        return client.post(reverse("properties:restore", kwargs={"pk": prop.pk}))
+
+    def test_get_not_allowed(self, auth_client, db):
+        prop = PropertyFactory()
+        resp = auth_client.get(reverse("properties:withdraw", kwargs={"pk": prop.pk}))
+        assert resp.status_code == 405
+
+    def test_withdraw_pauses_published_and_redirects(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        listing = ListingFactory(property=prop, status=ListingStatus.PUBLISHED)
+        resp = self._withdraw(auth_client, prop)
+        assert resp.status_code == 302
+        assert resp.url == reverse("properties:detail", kwargs={"pk": prop.pk})
+        prop.refresh_from_db(); listing.refresh_from_db()
+        assert prop.status == PropertyStatus.UNAVAILABLE
+        assert listing.status == ListingStatus.PAUSED
+
+    def test_withdraw_invalid_state_messages_and_redirects(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        resp = auth_client.post(
+            reverse("properties:withdraw", kwargs={"pk": prop.pk}), follow=True,
+        )
+        # Siguió el 302 hasta el detail
+        assert resp.redirect_chain == [
+            (reverse("properties:detail", kwargs={"pk": prop.pk}), 302)
+        ]
+        prop.refresh_from_db()
+        assert prop.status == PropertyStatus.RENTED
+        assert any(
+            m.level == django_messages.ERROR for m in resp.context["messages"]
+        )
+    def test_restore_republishes_when_gate_passes(self, auth_client, db):
+        prop = PropertyFactory(
+            status=PropertyStatus.UNAVAILABLE, description="x" * 200,
+        )
+        PropertyMediaFactory.create_batch(5, property=prop)
+        listing = ListingFactory(property=prop, status=ListingStatus.PAUSED)
+        resp = self._restore(auth_client, prop)
+        assert resp.status_code == 302
+        prop.refresh_from_db(); listing.refresh_from_db()
+        assert prop.status == PropertyStatus.AVAILABLE
+        assert listing.status == ListingStatus.PUBLISHED
+
+    def test_restore_gate_rejection_renders_checklist_and_rolls_back(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE, description="corta")
+        listing = ListingFactory(property=prop, status=ListingStatus.PAUSED)
+        resp = self._restore(auth_client, prop)
+        assert resp.status_code == 200
+        codes = {item.code for item in resp.context["checklist_items"]}
+        assert codes == {"photos", "description"}
+        # A1: el atomic del orquestador revirtió TODO
+        prop.refresh_from_db(); listing.refresh_from_db()
+        assert prop.status == PropertyStatus.UNAVAILABLE
+        assert listing.status == ListingStatus.PAUSED
