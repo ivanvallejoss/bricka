@@ -18,7 +18,13 @@
                         ${{ listing.price|floatformat:0 }}
                     </p>
                 </div>
-                {% if listing.status == 'published' %}
+                {% if listing.contextual_badge %}
+                    <span title="Pausada al concretarse la venta"
+                          class="px-2 py-0.5 rounded-full text-[11px] font-medium
+                                 border border-warning-text/40 text-warning-text">
+                        {{ listing.contextual_badge.text }}
+                    </span>
+                {% elif listing.status == 'published' %}
                     <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-success-bg text-success-text">
                         Publicado
                     </span>

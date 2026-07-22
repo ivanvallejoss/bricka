@@ -10,6 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.contrib import messages
 from django.contrib.gis.geos import Point
 from django.conf import settings
+from django.urls import reverse
 
 from urllib.parse import urlencode
 
@@ -45,7 +46,7 @@ from .forms import (
     ExternalSourceForm,
     LocationForm,
     )
-from .choices import FeatureCategory, PropertyType
+from .choices import FeatureCategory, PropertyType, PropertyStatus
 from .checklist import FLOW_EDIT, FLOW_WIZARD, build_publication_checklist
 
 from apps.billing.selectors import (
@@ -76,7 +77,10 @@ from apps.documents.utils import categorize_document
 from apps.listings.selectors import get_listings_for_property, get_listing_detail
 from apps.listings.services import (
     MIN_PHOTOS_TO_PUBLISH, MIN_DESCRIPTION_LENGTH,
-    create_listing, update_listing_status, update_listing_price,
+    create_listing, 
+    update_listing_status, 
+    update_listing_price,
+    archive_listing,
 )
 from apps.listings.exceptions import ListingValidationError, ListingPublicationRequirementsError
 from apps.listings.choices import OperationType, PricePeriod, ListingStatus
@@ -305,7 +309,7 @@ def slide_over_publications(request, pk):
         prop = get_property_preview(pk)
     except Property.DoesNotExist:
         raise Http404
-    listings = list(get_listings_for_property(pk))
+    listings = _annotate_listing_badges(prop, list(get_listings_for_property(pk)))
     return render(request, "properties/partials/_slide_over_publications.html", {
         "property": prop,
         "listings": listings,
@@ -366,6 +370,24 @@ def slide_over_documents(request, pk):
     })
 
 
+def _annotate_listing_badges(prop, listings):
+    """
+    Badge contextual por listing (S4/§8), resuelto en view — patrón BadgeContext.
+    Caso único hoy: alquiler PAUSED post-venta. Sin joins nuevos: ambos estados
+    ya están en memoria, la nota contextual entra gratis (cláusula de §8).
+    PAUSED por retiro (UNAVAILABLE) NO lleva badge.
+    """
+    for listing in listings:
+        listing.contextual_badge = None
+        if (
+            listing.status == ListingStatus.PAUSED
+            and prop.status == PropertyStatus.SOLD
+            and listing.operation_type in (OperationType.RENT, OperationType.TEMPORARY_RENT)
+        ):
+            listing.contextual_badge = BadgeContext(text="Pausada", style="warning")
+    return listings
+
+
 def _property_detail_context(pk):
     """
     Contexto completo del detail. Lo comparten property_detail (GET) y
@@ -395,7 +417,7 @@ def _property_detail_context(pk):
         cover_url = get_public_media_url(cover_media.r2_key)
 
     gallery_urls = [get_public_media_url(m.r2_key) for m in media_list]
-    listings = list(get_listings_for_property(pk))
+    listings = _annotate_listing_badges(prop, list(get_listings_for_property(pk)))
 
     return {
         "property": prop,
@@ -470,9 +492,11 @@ def property_restore(request, pk):
 
 
 def detail_publication(request, pk):
-    if not Property.objects.filter(pk=pk).exists():
+    try:
+        prop = get_property_preview(pk)
+    except Property.DoesNotExist:
         raise Http404
-    listings = list(get_listings_for_property(pk))
+    listings = _annotate_listing_badges(prop, list(get_listings_for_property(pk)))
     return render(request, "properties/partials/_detail_publication.html", {
         "listings": listings,
     })
@@ -1052,6 +1076,66 @@ def listing_price(request, pk, listing_id):
         "properties/partials/_operacion_listing_row.html",
         _listing_row_context(listing, flow, price_error=form.errors["price"][0]),
     )
+
+
+def listing_pause(request, pk, listing_id):
+    """
+    Saca un listing de publicaciones (insumo S3b): PUBLISHED -> PAUSED.
+    Flip liviano de listing, SIN orquestador — la capa propiedad no se toca.
+    Guard de estado en la view: update_listing_status no valida transiciones
+    hacia PAUSED, y el boton solo existe en PUBLISHED — un POST desde otra
+    fila es staleness/carrera -> modal_error.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        listing = get_listing_detail(listing_id)
+    except ObjectDoesNotExist:
+        raise Http404
+    if listing.property_id != pk:
+        raise Http404
+
+    flow = request.POST.get("flow", FLOW_EDIT)
+    if listing.status != ListingStatus.PUBLISHED:
+        return _modal_response(request, "partials/modal_error.html", {
+            "error": "Solo se puede sacar de publicaciones un listing publicado.",
+        })
+    listing = update_listing_status(
+        listing=listing, status=ListingStatus.PAUSED, actor=request.user,
+    )
+    return render(
+        request,
+        "properties/partials/_operacion_listing_row.html",
+        _listing_row_context(listing, flow),
+    )
+
+
+def listing_discard(request, pk, listing_id):
+    """
+    Descarta un listing DRAFT (insumo S3b): archive_listing (soft-delete).
+    Libera el slot de la constraint -> recrear el tipo queda permitido. Es la
+    via de salida del DRAFT pegado (friccion de S3b). Accion destructiva ->
+    form nativo + redirect (convencion frontend.md); el destino depende del
+    flujo. Solo DRAFT es descartable: para otros estados la accion no existe
+    (mismo criterio que el boton) -> 404.
+    """
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    try:
+        listing = get_listing_detail(listing_id)
+    except ObjectDoesNotExist:
+        raise Http404
+    if listing.property_id != pk:
+        raise Http404
+    if listing.status != ListingStatus.DRAFT:
+        raise Http404
+
+    archive_listing(listing=listing, actor=request.user)
+
+    flow = request.POST.get("flow", FLOW_EDIT)
+    if flow == FLOW_WIZARD:
+        return redirect("properties:new_operacion", pk=pk)
+    return redirect(reverse("properties:edit", args=[pk]) + "#operacion-section")
 
 
 def geocode(request):

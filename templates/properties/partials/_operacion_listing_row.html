@@ -55,6 +55,45 @@ DRAFT/PAUSED. Ambos forms cargan flow para preservarlo al re-renderear la fila.
             </button>
         </form>
 
+        {% if listing.status == 'draft' %}
+        <div x-data="{ confirming: false }" class="flex items-center gap-2">
+            <button type="button" x-show="!confirming" @click="confirming = true"
+                    class="px-2.5 py-1 text-xs font-medium text-danger-text border border-danger-text/30 rounded
+                           hover:bg-danger-bg transition-colors">
+                Descartar
+            </button>
+            <div x-show="confirming" x-cloak class="flex items-center gap-1.5">
+                <span class="text-xs text-on-surface-variant">¿Descartar el borrador?</span>
+                <button type="button" @click="confirming = false"
+                        class="px-2 py-1 text-xs text-on-surface-variant hover:text-on-surface transition-colors">
+                    No
+                </button>
+                <form method="post" action="{% url 'properties:listing_discard' listing.property_id listing.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="flow" value="{{ flow }}">
+                    <button type="submit"
+                            class="px-2.5 py-1 text-xs font-medium bg-danger-bg border border-danger-text/30
+                                   text-danger-text rounded hover:bg-danger-text hover:text-white transition-colors">
+                        Sí
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if listing.status == 'published' %}
+        <form hx-post="{% url 'properties:listing_pause' listing.property_id listing.id %}"
+              hx-target="#listing-{{ listing.id }}" hx-swap="outerHTML"
+              class="ml-auto">
+            <input type="hidden" name="flow" value="{{ flow }}">
+            <button type="submit"
+                    class="px-2.5 py-1 text-xs font-medium text-on-surface-variant border border-outline rounded
+                           hover:bg-surface-container transition-colors">
+                Sacar de publicaciones
+            </button>
+        </form>
+        {% endif %}
+
         {% if listing.status == 'draft' or listing.status == 'paused' %}
         <form hx-post="{% url 'properties:listing_publish' listing.property_id listing.id %}"
               hx-target="#listing-{{ listing.id }}" hx-swap="outerHTML"
@@ -63,7 +102,7 @@ DRAFT/PAUSED. Ambos forms cargan flow para preservarlo al re-renderear la fila.
             <button type="submit"
                     class="px-3 py-1 text-xs font-medium bg-primary-container text-on-primary rounded
                            hover:bg-primary transition-colors">
-                Publicar
+                {% if listing.status == 'paused' %}Reactivar{% else %}Publicar{% endif %}
             </button>
         </form>
         {% endif %}

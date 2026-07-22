@@ -910,3 +910,147 @@ class TestPropertyWithdrawRestore:
         prop.refresh_from_db(); listing.refresh_from_db()
         assert prop.status == PropertyStatus.UNAVAILABLE
         assert listing.status == ListingStatus.PAUSED
+
+    # ── Paso 2: wiring de templates ────────────────────────────────
+
+    def test_sidebar_shows_withdraw_only_when_available(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.AVAILABLE)
+        resp = auth_client.get(reverse("properties:detail", kwargs={"pk": prop.pk}))
+        content = resp.content.decode()
+        assert "Retirar del mercado" in content
+        assert "Volver al mercado" not in content
+
+    def test_sidebar_shows_restore_only_when_unavailable(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)
+        resp = auth_client.get(reverse("properties:detail", kwargs={"pk": prop.pk}))
+        content = resp.content.decode()
+        assert "Volver al mercado" in content
+        assert "Retirar del mercado" not in content
+
+    def test_sidebar_hides_both_actions_in_other_states(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.RENTED)
+        resp = auth_client.get(reverse("properties:detail", kwargs={"pk": prop.pk}))
+        content = resp.content.decode()
+        assert "Retirar del mercado" not in content
+        assert "Volver al mercado" not in content
+
+    def test_gate_rejection_page_renders_checklist(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)
+        ListingFactory(property=prop, status=ListingStatus.PAUSED)
+        resp = self._restore(auth_client, prop)
+        assert "No se puede publicar todavía" in resp.content.decode()
+
+    def test_paused_rent_post_sale_gets_badge(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.SOLD)
+        ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PAUSED,
+        )
+        resp = auth_client.get(reverse("properties:detail", kwargs={"pk": prop.pk}))
+        listings = resp.context["listings"]
+        assert listings[0].contextual_badge is not None
+        assert listings[0].contextual_badge.text == "Pausada"
+        # La sección Publicaciones carga lazy: el HTML del badge sale de su endpoint
+        resp_pub = auth_client.get(
+            reverse("properties:detail_publication", kwargs={"pk": prop.pk})
+        )
+        assert "Pausada al concretarse la venta" in resp_pub.content.decode()
+
+    def test_paused_by_withdrawal_gets_no_badge(self, auth_client, db):
+        prop = PropertyFactory(status=PropertyStatus.UNAVAILABLE)
+        ListingFactory(
+            property=prop,
+            operation_type=OperationType.RENT,
+            status=ListingStatus.PAUSED,
+        )
+        resp = auth_client.get(reverse("properties:detail", kwargs={"pk": prop.pk}))
+        assert resp.context["listings"][0].contextual_badge is None
+
+
+class TestListingPauseDiscard:
+    def _pause(self, client, listing, flow="edit"):
+        return client.post(
+            reverse("properties:listing_pause", args=[listing.property_id, listing.id]),
+            data={"flow": flow},
+        )
+
+    def _discard(self, client, listing, flow="edit"):
+        return client.post(
+            reverse("properties:listing_discard", args=[listing.property_id, listing.id]),
+            data={"flow": flow},
+        )
+
+    def test_pause_published_rerenders_row(self, auth_client, db):
+        listing = ListingFactory(status=ListingStatus.PUBLISHED)
+        resp = self._pause(auth_client, listing)
+        assert resp.status_code == 200
+        assert resp.get("HX-Retarget") is None
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.PAUSED
+        assert "Reactivar" in resp.content.decode()
+
+    def test_pause_non_published_goes_to_modal_error(self, auth_client, db):
+        listing = ListingFactory(status=ListingStatus.DRAFT)
+        resp = self._pause(auth_client, listing)
+        assert resp.get("HX-Retarget") == "#modal-container"
+        listing.refresh_from_db()
+        assert listing.status == ListingStatus.DRAFT
+
+    def test_discard_draft_soft_deletes_and_redirects_edit(self, auth_client, db):
+        listing = ListingFactory(status=ListingStatus.DRAFT)
+        resp = self._discard(auth_client, listing)
+        assert resp.status_code == 302
+        assert resp.url == (
+            reverse("properties:edit", args=[listing.property_id]) + "#operacion-section"
+        )
+        from apps.listings.models import Listing
+        archived = Listing.all_objects.get(pk=listing.pk)
+        assert archived.deleted_at is not None
+
+    def test_discard_draft_redirects_wizard_flow(self, auth_client, db):
+        listing = ListingFactory(status=ListingStatus.DRAFT)
+        resp = self._discard(auth_client, listing, flow="wizard")
+        assert resp.status_code == 302
+        assert resp.url == reverse("properties:new_operacion", kwargs={"pk": listing.property_id})
+
+    def test_discard_frees_the_constraint_slot(self, auth_client, db):
+        # La fricción de S3b: DRAFT pegado retiene el slot. Descartarlo
+        # (soft-delete) lo libera y el tipo se puede recrear.
+        from apps.listings.services import create_listing
+        from decimal import Decimal
+        listing = ListingFactory(status=ListingStatus.DRAFT, operation_type=OperationType.RENT)
+        self._discard(auth_client, listing)
+        prop = listing.property
+        recreated = create_listing(
+            property=prop,
+            operation_type=OperationType.RENT,
+            price=Decimal("99000.00"),
+            currency=listing.currency,
+            period=PricePeriod.MONTHLY,
+            price_min_acceptable=None,
+            actor=listing.created_by,
+        )
+        assert recreated.pk != listing.pk
+
+    def test_discard_non_draft_is_404(self, auth_client, db):
+        listing = ListingFactory(status=ListingStatus.PUBLISHED)
+        resp = self._discard(auth_client, listing)
+        assert resp.status_code == 404
+        listing.refresh_from_db()
+        assert listing.deleted_at is None
+
+    def test_row_actions_per_status(self, auth_client, db):
+        # Wiring de visibilidad: cada estado muestra sus acciones y no otras.
+        published = ListingFactory(status=ListingStatus.PUBLISHED)
+        resp = auth_client.get(reverse("properties:edit", args=[published.property_id]))
+        html = resp.content.decode()
+        assert "Sacar de publicaciones" in html
+        assert "Descartar" not in html
+
+        draft = ListingFactory(status=ListingStatus.DRAFT)
+        resp = auth_client.get(reverse("properties:edit", args=[draft.property_id]))
+        html = resp.content.decode()
+        assert "Descartar" in html
+        assert ">Publicar" in html.replace("\n", "").replace(" ", "")
+        assert "Sacar de publicaciones" not in html
