@@ -89,7 +89,7 @@ unicidad (limpieza solo en el camino del seed/reset, bucket de media dev).
 - **Flag `--with-r2-uploads`** (enmienda a S3a §4, que lo había diferido):
   sube un JPEG placeholder (1x1, ~630 bytes, hardcodeado en base64 a nivel
   módulo) por cada PropertyMedia sembrada vía `upload_public_media`. Las
-  <img> del seed dejan de renderizar rotas en dev, y el ciclo doble de
+  `<img>` del seed dejan de renderizar rotas en dev, y el ciclo doble de
   verificación es reproducible sin depender de basura manual. Best-effort:
   sin credenciales reporta y sigue (las keys sintéticas sin objeto son el
   estado pre-flag, no un error).

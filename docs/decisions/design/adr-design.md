@@ -1096,3 +1096,26 @@ El invariante queda en tres capas con funciones distintas:
 Consecuencia: la unicidad-en-publish de update_listing_status pasó a
 rama DEFENSIVA (inalcanzable por construcción) — log CRITICAL + error
 genérico. Si se dispara, la constraint fue vulnerada.
+
+### Guards de operaciones destructivas sobre buckets (S4)
+
+**Contexto.** `cleanup_r2_orphans` (S4) es la primera operación del
+codebase que elimina objetos de un bucket R2 en lote. El vector de
+desastre no es un bug del diff sino un `.env` equivocado: un `--reset`
+corrido con credenciales/bucket de producción configurados.
+
+**Decisión.** Toda operación destructiva sobre un bucket exige DOS guards
+independientes, verificados por la propia operación (no por el caller):
+(1) `settings.DEBUG` activo; (2) el nombre del bucket con sufijo `-dev`.
+Si cualquiera falla → `CommandError`: no corre y dice cuál falló. El
+sufijo es contrato de nombres de infraestructura: los buckets de
+desarrollo SIEMPRE terminan en `-dev`; producción nunca.
+
+**Best-effort desde flujos compuestos.** Cuando la operación destructiva
+es un paso final de un flujo mayor ya commiteado (el reset del seed), el
+caller la trata como best-effort: captura CommandError (guard: hizo su
+trabajo) y Exception (I/O) como warning, sin abortar el flujo. Corriendo
+suelta, frena en seco.
+
+**Consecuencias.** El comando es inservible en producción a propósito;
+una futura limpieza productiva es OTRA decisión con OTROS guards (obs.#7 general). Los guards se testean como comportamiento: guard fallido → cero llamadas de borrado al cliente de storage.
