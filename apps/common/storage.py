@@ -132,6 +132,23 @@ def delete_public_media(key: str) -> None:
     _client().delete_object(Bucket=settings.R2_PUBLIC_MEDIA_BUCKET, Key=key)
 
 
+def list_public_media_objects(*, prefix: str = "properties/"):
+    """
+    Listado paginado del bucket público de media. Genera dicts
+    {"key", "last_modified"} — LastModified viene gratis en ListObjectsV2 y
+    habilita la ventana de gracia de la limpieza de huérfanos (S4).
+    Paginación vía paginator de boto3 (1000 keys por página, transparente).
+    Solo lectura: el borrado es decisión del caller (delete_public_media).
+    """
+    paginator = _client().get_paginator("list_objects_v2")
+    pages = paginator.paginate(
+        Bucket=settings.R2_PUBLIC_MEDIA_BUCKET, Prefix=prefix,
+    )
+    for page in pages:
+        for obj in page.get("Contents", []):
+            yield {"key": obj["Key"], "last_modified": obj["LastModified"]}
+
+
 # --------------------------------------------------------------------------
 # Bucket privado — documentos legales (Document)
 # --------------------------------------------------------------------------

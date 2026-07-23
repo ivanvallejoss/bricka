@@ -8,8 +8,11 @@ Anclado a date.today() para badges deterministas. --reset trunca y resiembra.
 Reemplaza a seed_demo_data (a eliminar una vez que esto corra verde de punta
 a punta).
 """
-from __future__ import annotations
 
+from __future__ import annotations
+from io import BytesIO
+
+import base64
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -17,24 +20,32 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
+from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
 from apps.common.choices import Currency
+from apps.common.storage import build_media_key, upload_public_media
+
 from apps.billing.choices import ConceptLineType, DocumentType
 from apps.billing.concept import ConceptLine
 from apps.billing.models import BillingDocument
 from apps.billing.services import create_billing_document
+
 from apps.contacts.models import Contact, SearchPreference
 from apps.contacts.choices import ContactRole, ContactSource, ContactType   # +ContactType
 from apps.contacts.services import archive_contact, create_contact, create_contact     # +archive_contact
+
 from apps.contracts.choices import AdjustmentIndex, GuaranteeType
 from apps.contracts.models import RentalContract, RentAdjustment
 from apps.contracts.services import apply_rent_adjustment, create_rental_contract, expire_contract, terminate_contract
+
 from apps.deals.models import Deal, DealStageHistory
 from apps.deals.choices import DealOutcome, DealType
 from apps.deals.services import close_deal, create_deal
+
 from apps.documents.models import Document
+
 from apps.listings.choices import (
     ListingStatus, OperationType, PricePeriod, PublicationChannel, PublicationStatus,
 ) 
@@ -45,10 +56,10 @@ from apps.listings.services import (
     MIN_PHOTOS_TO_PUBLISH,
 )
 
-from apps.common.storage import build_media_key
 from apps.properties.choices import PropertyType, PropertyStatus
 from apps.properties.models import ExternalPropertySource, Property, PropertyMedia
 from apps.properties.services import create_property, upload_property_media
+
 from apps.operations.services import withdraw_property
 
 _SENTINEL_USERNAME = "bricka_seed"
@@ -85,6 +96,25 @@ _RESISTENCIA_POINTS = {
 }
 
 
+# JPEG 1x1 gris válido (~630 bytes). Placeholder de --with-r2-uploads: las
+# keys sintéticas del seed pasan a tener objeto real y las <img> dejan de
+# renderizar rotas en dev (el motivo por el que S3a difirió el flag).
+_PLACEHOLDER_JPEG = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9"
+    "PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARESEhgVGC8aGi9jQjhC"
+    "Y2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2P/wAAR"
+    "CAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAA"
+    "AgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkK"
+    "FhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWG"
+    "h4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl"
+    "5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREA"
+    "AgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYk"
+    "NOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOE"
+    "hYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk"
+    "5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDaooooA//Z"
+)
+
+
 class Command(BaseCommand):
     help = (
         "Siembra data de prueba para testear flujos en las cuatro verticales. "
@@ -99,6 +129,14 @@ class Command(BaseCommand):
         parser.add_argument(
             "--noinput", "--no-input", action="store_false", dest="interactive",
             help="No pedir confirmación interactiva (CI/tests).",
+        )
+        parser.add_argument(
+            "--with-r2-uploads", action="store_true", dest="with_r2_uploads",
+            help=(
+                "Sube un placeholder real a R2 dev por cada PropertyMedia "
+                "sembrada (las <img> dejan de estar rotas). Requiere "
+                "credenciales R2 en el entorno."
+            ),
         )
 
     def handle(self, *args, **options):
@@ -123,6 +161,34 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"✗ Error en la siembra: {exc}"))
             raise
         self.stdout.write(self.style.SUCCESS("✓ Data sembrada."))
+
+        if options["with_r2_uploads"]:
+            self._upload_r2_placeholders()
+
+        # Limpieza de huérfanos: SOLO en el camino del reset, y AL FINAL —
+        # el diff corre contra la DB recién sembrada, así que elimina los
+        # objetos del ciclo anterior y retiene los recién subidos. Los guards
+        # del comando (DEBUG + bucket '-dev') aplican; si fallan, la limpieza
+        # no corre y se reporta sin abortar: la siembra ya commiteó y es
+        # válida — el guard hizo su trabajo, no hay nada que revertir.
+        if options["reset"]:
+            try:
+                # Gracia 0 en el camino del reset: post-TRUNCATE ningún upload
+                # en vuelo puede confirmarse (su propiedad ya no existe), así
+                # que todo objeto sin fila es huérfano definitivo. El default
+                # de 10 min queda para el modo suelto, con DB viva.
+                call_command("cleanup_r2_orphans", grace_minutes=0)
+            except CommandError as exc:
+                # Guard del comando (DEBUG / bucket no-dev): hizo su trabajo.
+                self.stdout.write(self.style.WARNING(
+                    f"⚠ Limpieza R2 omitida: {exc}"
+                ))
+            except Exception as exc:
+                # I/O contra R2 (credenciales, red): la siembra ya commiteó
+                # y es válida — la limpieza es best-effort, se reporta y sigue.
+                self.stdout.write(self.style.WARNING(
+                    f"⚠ Limpieza R2 falló ({type(exc).__name__}): {exc}"
+                ))
 
     # ── Seguridad ──────────────────────────────────────────────────────
     def _confirm_reset(self, *, interactive: bool) -> None:
@@ -242,6 +308,32 @@ class Command(BaseCommand):
                 order=i,
                 actor=actor,
             )
+
+
+    def _upload_r2_placeholders(self):
+        """
+        Sube el placeholder por cada PropertyMedia sembrada (--with-r2-uploads).
+        I/O real contra R2 dev: si falla (sin credenciales, red), reporta y
+        sigue — las keys sintéticas sin objeto son el estado pre-flag, no un
+        error de siembra.
+        """
+        media = list(PropertyMedia.objects.all())
+        self.stdout.write(f"→ Subiendo {len(media)} placeholders a R2 dev...")
+        uploaded = 0
+        try:
+            for m in media:
+                upload_public_media(
+                    key=m.r2_key,
+                    fileobj=BytesIO(_PLACEHOLDER_JPEG),
+                    content_type="image/jpeg",
+                )
+                uploaded += 1
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(
+                f"⚠ Subida interrumpida tras {uploaded}/{len(media)}: {exc}"
+            ))
+            return
+        self.stdout.write(self.style.SUCCESS(f"✓ {uploaded} placeholders subidos."))
 
 
     # ── Clusters ───────────────────────────────────────────────────────
